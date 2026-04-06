@@ -5,170 +5,130 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>image × sound → video</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #1a1a1a; --bg: #f8f8f8; --surface: #fff;
+  --border: #d0d0d0; --muted: #666;
+  --accent: #4a7cff; --accent-dark: #2a5ce0;
+  --red: #cc3333; --green: #2a9d5c; --orange: #e07020;
+}
+html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-family: 'Hiragino Kaku Gothic ProN','Hiragino Sans','Yu Gothic UI','Meiryo',sans-serif; font-size: 14px; line-height: 1.6; }
+.container { max-width: 640px; margin: 0 auto; padding: 40px 24px 60px; }
 
-  :root {
-    --ink: #1a1a1a;
-    --bg: #f8f8f8;
-    --surface: #ffffff;
-    --border: #d0d0d0;
-    --muted: #666666;
-    --accent: #4a7cff;
-    --accent-dark: #2a5ce0;
-    --red: #cc3333;
-    --green: #2a9d5c;
-    --orange: #e07020;
-  }
+/* header */
+.header { margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
+.header-mark { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 4px; }
+.header h1 { font-size: 24px; font-weight: 700; }
 
-  html, body {
-    min-height: 100%;
-    background: var(--bg);
-    color: var(--ink);
-    font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic UI', 'Meiryo', sans-serif;
-    font-size: 14px;
-    line-height: 1.6;
-  }
+/* tabs */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 24px; }
+.mode-tab { padding: 11px 4px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+.mode-tab:hover { border-color: var(--accent); color: var(--accent); }
+.mode-tab.active { border-color: var(--accent); background: var(--accent); color: #fff; }
+.mode-tab.active-orange { border-color: var(--orange); background: var(--orange); color: #fff; }
 
-  .container { max-width: 640px; margin: 0 auto; padding: 40px 24px 60px; }
+/* drop zone */
+.drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.drop-zone { border: 2px dashed var(--border); border-radius: 8px; padding: 22px 14px; text-align: center; cursor: pointer; transition: border-color .2s, background .2s; background: var(--surface); }
+.drop-zone:hover { border-color: var(--accent); background: #f0f4ff; }
+.drop-zone.dragover { border-color: var(--accent); background: #e8eeff; }
+.drop-zone.filled { border-color: var(--green); border-style: solid; background: #f0faf5; }
+.drop-zone input { display: none; }
+.drop-icon { font-size: 28px; margin-bottom: 6px; display: block; }
+.drop-label { font-size: 14px; font-weight: 700; display: block; margin-bottom: 3px; }
+.drop-hint { font-size: 11px; color: var(--muted); }
+.drop-filename { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 5px; word-break: break-all; }
 
-  .header { margin-bottom: 28px; padding-bottom: 16px; border-bottom: 2px solid var(--ink); }
-  .header-mark { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 4px; }
-  .header h1 { font-size: 24px; font-weight: 700; color: var(--ink); }
+/* preview */
+.preview-section { margin-bottom: 16px; display: none; }
+.preview-section.show { display: block; }
+.section-label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+.image-preview { width: 100%; aspect-ratio: 9/16; object-fit: cover; border-radius: 8px; display: block; background: #e0e0e0; border: 1px solid var(--border); }
+.audio-preview { width: 100%; accent-color: var(--accent); }
 
-  /* タブ */
-  .mode-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 24px; }
-  .mode-tab {
-    padding: 11px 4px; border: 2px solid var(--border); border-radius: 8px;
-    background: var(--surface); color: var(--muted);
-    font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s;
-  }
-  .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
-  .mode-tab.active { border-color: var(--accent); background: var(--accent); color: white; }
-  .mode-tab.active-orange { border-color: var(--orange); background: var(--orange); color: white; }
+/* options */
+.options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.option-group label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 5px; }
+.option-group select { width: 100%; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--ink); cursor: pointer; }
+.option-group select:focus { outline: 2px solid var(--accent); }
 
-  /* ドロップゾーン */
-  .drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
-  .drop-zone {
-    border: 2px dashed var(--border); border-radius: 8px; padding: 22px 14px;
-    text-align: center; cursor: pointer; transition: border-color 0.2s, background 0.2s; background: var(--surface);
-  }
-  .drop-zone:hover { border-color: var(--accent); background: #f0f4ff; }
-  .drop-zone.dragover { border-color: var(--accent); background: #e8eeff; }
-  .drop-zone.filled { border-color: var(--green); border-style: solid; background: #f0faf5; }
-  .drop-zone input { display: none; }
-  .drop-icon { font-size: 28px; margin-bottom: 6px; display: block; }
-  .drop-label { font-size: 14px; font-weight: 700; color: var(--ink); display: block; margin-bottom: 3px; }
-  .drop-hint { font-size: 11px; color: var(--muted); }
-  .drop-filename { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 5px; word-break: break-all; }
+/* info box */
+.info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #5a4a00; margin-bottom: 14px; line-height: 1.7; }
 
-  /* プレビュー */
-  .preview-section { margin-bottom: 16px; display: none; }
-  .preview-section.show { display: block; }
-  .section-label { font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
-  .image-preview { width: 100%; aspect-ratio: 9/16; object-fit: cover; border-radius: 8px; display: block; background: #e0e0e0; border: 1px solid var(--border); }
-  .audio-preview { width: 100%; accent-color: var(--accent); }
+/* fade toggle */
+.fade-toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+.toggle-track { width: 40px; height: 22px; background: var(--border); border-radius: 11px; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; border: none; }
+.toggle-track.on { background: var(--accent); }
+.toggle-thumb { width: 16px; height: 16px; background: #fff; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform .2s ease; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.toggle-track.on .toggle-thumb { transform: translateX(18px); }
+.fade-toggle span { font-size: 13px; font-weight: 500; }
 
-  /* オプション */
-  .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-  .option-group label { display: block; font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 5px; }
-  .option-group select {
-    width: 100%; background: var(--surface); border: 1px solid var(--border);
-    border-radius: 6px; padding: 8px 10px; font-size: 13px; font-family: inherit; color: var(--ink); cursor: pointer;
-  }
+/* lyric tab */
+.lyric-textarea { width: 100%; min-height: 150px; border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; line-height: 1.8; }
+.lyric-textarea:focus { outline: 2px solid var(--orange); border-color: transparent; }
 
-  /* info box */
-  .info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #5a4a00; margin-bottom: 14px; }
+.lyric-tap-area { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; margin-top: 12px; }
+.lyric-tap-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #fff3e0; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; }
+.lyric-tap-timer { font-size: 22px; font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; }
+.lyric-current { padding: 18px 16px; text-align: center; font-size: 22px; font-weight: 700; min-height: 68px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
+.lyric-next { padding: 8px 16px; text-align: center; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); }
+.lyric-progress-bar { height: 4px; background: #e0e0e0; }
+.lyric-progress-fill { height: 100%; background: var(--orange); width: 0%; transition: width .1s linear; }
+.lyric-tap-btn { width: 100%; padding: 18px; background: var(--orange); color: #fff; border: none; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity .1s; }
+.lyric-tap-btn:active { opacity: .75; }
+.lyric-tap-btn:disabled { opacity: .4; cursor: not-allowed; }
 
-  /* フェードトグル */
-  .fade-toggle { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
-  .toggle-track { width: 40px; height: 22px; background: var(--border); border-radius: 11px; position: relative; cursor: pointer; transition: background 0.2s; flex-shrink: 0; border: none; }
-  .toggle-track.on { background: var(--accent); }
-  .toggle-thumb { width: 16px; height: 16px; background: white; border-radius: 50%; position: absolute; top: 3px; left: 3px; transition: transform 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-  .toggle-track.on .toggle-thumb { transform: translateX(18px); }
-  .fade-toggle span { font-size: 13px; color: var(--ink); font-weight: 500; }
+.lyric-controls { display: flex; gap: 8px; margin-top: 10px; }
+.btn-sm { flex: 1; padding: 9px 0; border-radius: 6px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--ink); transition: all .2s; }
+.btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sm.done-btn { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-sm.done-btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-sm.done-btn:hover:not(:disabled) { opacity: .85; }
 
-  /* ══ 字幕タブ ══ */
-  .lyric-textarea {
-    width: 100%; min-height: 150px; border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px; font-size: 14px; font-family: inherit; resize: vertical; line-height: 1.8;
-  }
-  .lyric-textarea:focus { outline: 2px solid var(--orange); border-color: transparent; }
+.lyric-list { max-height: 140px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: 10px; }
+.lyric-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+.lyric-item:last-child { border-bottom: none; }
+.lyric-item.done { color: var(--green); }
+.lyric-item-time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 70px; font-size: 11px; }
 
-  .lyric-tap-area { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; margin-top: 12px; }
-  .lyric-tap-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #fff3e0; border-bottom: 1px solid var(--border); font-size: 13px; font-weight: 700; }
-  .lyric-tap-timer { font-size: 22px; font-weight: 700; color: var(--orange); font-variant-numeric: tabular-nums; }
-  .lyric-current { padding: 18px 16px; text-align: center; font-size: 22px; font-weight: 700; color: var(--ink); min-height: 68px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid var(--border); }
-  .lyric-next { padding: 8px 16px; text-align: center; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--border); }
-  .lyric-progress-bar { height: 4px; background: #e0e0e0; }
-  .lyric-progress-fill { height: 100%; background: var(--orange); width: 0%; transition: width 0.1s linear; }
-  .lyric-tap-btn {
-    width: 100%; padding: 18px; background: var(--orange); color: white; border: none;
-    font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: opacity 0.1s;
-  }
-  .lyric-tap-btn:active { opacity: 0.75; }
-  .lyric-tap-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.lrc-result { margin-top: 12px; display: none; }
+.lrc-result.show { display: block; }
+.lrc-preview { background: #1a1a2e; color: #a8d8ff; font-size: 12px; font-family: monospace; padding: 12px; border-radius: 8px; max-height: 160px; overflow-y: auto; white-space: pre; margin-bottom: 10px; }
 
-  .lyric-controls { display: flex; gap: 8px; margin-top: 10px; }
-  .btn-sm {
-    flex: 1; padding: 9px 0; border-radius: 6px; font-family: inherit; font-size: 13px;
-    font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--ink); transition: all 0.2s;
-  }
-  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
-  .btn-sm.done-btn { background: var(--green); color: white; border-color: var(--green); }
-  .btn-sm.done-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-sm.done-btn:hover { opacity: 0.85; color: white; }
+/* subtitle settings */
+.subtitle-settings { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 16px; background: var(--surface); }
+.subtitle-settings-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.settings-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
+.setting-item label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+.setting-item select { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-size: 12px; font-family: inherit; background: var(--surface); cursor: pointer; }
+.setting-item input[type="color"] { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 3px; height: 34px; cursor: pointer; }
+.subtitle-preview-box { margin-top: 12px; background: #222; border-radius: 8px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.subtitle-preview-text { text-align: center; padding: 0 12px; }
 
-  .lyric-list { max-height: 140px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; margin-top: 10px; }
-  .lyric-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
-  .lyric-item:last-child { border-bottom: none; }
-  .lyric-item.done { color: var(--green); }
-  .lyric-item-time { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 70px; font-size: 11px; }
+/* common */
+.divider { height: 1px; background: var(--border); margin: 20px 0; }
+#canvas { display: none; }
+.btn-generate { width: 100%; padding: 16px 0; background: var(--accent); color: #fff; border: none; border-radius: 8px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; transition: background .2s; margin-bottom: 16px; }
+.btn-generate:hover { background: var(--accent-dark); }
+.btn-generate:disabled { opacity: .5; cursor: not-allowed; }
 
-  .lrc-result { margin-top: 12px; display: none; }
-  .lrc-result.show { display: block; }
-  .lrc-preview { background: #1a1a2e; color: #a8d8ff; font-size: 12px; font-family: monospace; padding: 12px; border-radius: 8px; max-height: 160px; overflow-y: auto; white-space: pre; margin-bottom: 10px; }
+.progress-wrap { display: none; margin-bottom: 16px; }
+.progress-wrap.show { display: block; }
+.progress-label { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.progress-bar-bg { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; width: 0%; transition: width .3s ease; }
+.progress-step { font-size: 12px; color: var(--muted); margin-top: 5px; }
 
-  /* 字幕スタイル設定 */
-  .subtitle-settings { border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 16px; background: var(--surface); }
-  .subtitle-settings-title { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
-  .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .settings-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px; }
-  .setting-item label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .setting-item select { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-size: 12px; font-family: inherit; background: var(--surface); cursor: pointer; }
-  .setting-item input[type="color"] { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 3px; height: 34px; cursor: pointer; }
+.result-section { display: none; margin-top: 8px; }
+.result-section.show { display: block; }
+.result-video { width: 100%; border-radius: 8px; display: block; background: #000; margin-bottom: 10px; border: 1px solid var(--border); }
+.btn-download { width: 100%; padding: 14px 0; background: var(--green); color: #fff; border: none; border-radius: 8px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; display: block; text-align: center; }
+.btn-download:hover { opacity: .85; }
 
-  .subtitle-preview-box { margin-top: 12px; background: #222; border-radius: 8px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
-  .subtitle-preview-text { text-align: center; padding: 0 12px; }
-
-  /* canvas / generate / progress / result */
-  #canvas { display: none; }
-  .divider { height: 1px; background: var(--border); margin: 20px 0; }
-
-  .btn-generate {
-    width: 100%; padding: 16px 0; background: var(--accent); color: white; border: none;
-    border-radius: 8px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer;
-    transition: background 0.2s; margin-bottom: 16px;
-  }
-  .btn-generate:hover { background: var(--accent-dark); }
-  .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
-
-  .progress-wrap { display: none; margin-bottom: 16px; }
-  .progress-wrap.show { display: block; }
-  .progress-label { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
-  .progress-bar-bg { height: 8px; background: #e0e0e0; border-radius: 4px; overflow: hidden; }
-  .progress-bar-fill { height: 100%; background: var(--accent); border-radius: 4px; width: 0%; transition: width 0.3s ease; }
-  .progress-step { font-size: 12px; color: var(--muted); margin-top: 5px; }
-
-  .result-section { display: none; margin-top: 8px; }
-  .result-section.show { display: block; }
-  .result-video { width: 100%; border-radius: 8px; display: block; background: #000; margin-bottom: 10px; border: 1px solid var(--border); }
-  .btn-download { width: 100%; padding: 14px 0; background: var(--green); color: white; border: none; border-radius: 8px; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-decoration: none; display: block; text-align: center; }
-  .btn-download:hover { opacity: 0.85; }
-
-  .error-msg { display: none; color: var(--red); font-size: 13px; font-weight: 500; margin-bottom: 14px; padding: 10px 14px; border: 1px solid rgba(204,51,51,0.3); border-radius: 8px; background: rgba(204,51,51,0.06); }
-  .error-msg.show { display: block; }
-
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); text-align: center; }
+.error-msg { display: none; color: var(--red); font-size: 13px; font-weight: 500; margin-bottom: 14px; padding: 10px 14px; border: 1px solid rgba(204,51,51,.3); border-radius: 8px; background: rgba(204,51,51,.06); line-height: 1.5; }
+.error-msg.show { display: block; }
+.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); text-align: center; }
 </style>
 </head>
 <body>
@@ -179,6 +139,7 @@
     <h1>image × sound → video</h1>
   </div>
 
+  <!-- タブ -->
   <div class="mode-tabs">
     <button class="mode-tab active" id="tabImage" onclick="switchMode('image')">🖼 画像 × 音源</button>
     <button class="mode-tab" id="tabVideo" onclick="switchMode('video')">🎬 動画 × 音源</button>
@@ -203,7 +164,7 @@
     </div>
     <div class="preview-section" id="imgPreviewSection">
       <div class="section-label">PREVIEW — IMAGE</div>
-      <img class="image-preview" id="imgPreview" alt="preview">
+      <img class="image-preview" id="imgPreview" alt="">
     </div>
     <div class="preview-section" id="audioPreviewSection" style="margin-top:12px">
       <div class="section-label">PREVIEW — AUDIO</div>
@@ -302,9 +263,9 @@
       <div class="lrc-preview" id="lrcPreview"></div>
     </div>
 
-    <!-- 字幕スタイル設定 -->
+    <!-- STEP 4: 字幕スタイル -->
     <div class="subtitle-settings">
-      <div class="subtitle-settings-title">🎨 字幕スタイル設定</div>
+      <div class="subtitle-settings-title">🎨 STEP 4 — 字幕スタイル設定</div>
       <div class="settings-grid">
         <div class="setting-item">
           <label>フォント</label>
@@ -366,8 +327,66 @@
       </div>
     </div>
 
-    <div class="info-box" style="margin-top:14px">
-      ✅ 字幕設定が完了したら、<strong>「🖼 画像 × 音源」</strong>または<strong>「🎬 動画 × 音源」</strong>タブに切り替えて合成してください。字幕データは自動で引き継がれます。
+    <!-- STEP 5: 素材アップ & 合成 -->
+    <div class="divider" style="margin:18px 0 14px"></div>
+    <div class="section-label">STEP 5 — 素材をアップして合成</div>
+
+    <div class="options-grid" style="margin-bottom:12px">
+      <div class="option-group">
+        <label>素材タイプ</label>
+        <select id="lyricMediaType" onchange="switchLyricMediaType()">
+          <option value="image">🖼 画像に乗せる</option>
+          <option value="video">🎬 動画に乗せる</option>
+        </select>
+      </div>
+      <div class="option-group" id="lyricAspectWrap">
+        <label>アスペクト比</label>
+        <select id="lyricAspectSelect">
+          <option value="9:16">9:16（TikTok縦）</option>
+          <option value="1:1">1:1（正方形）</option>
+          <option value="16:9">16:9（横）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 画像ゾーン -->
+    <div id="lyricImageZoneWrap">
+      <div class="drop-grid">
+        <div class="drop-zone" id="lyricImgZone" onclick="document.getElementById('lyricImgInput').click()">
+          <input type="file" id="lyricImgInput" accept="image/*">
+          <span class="drop-icon">🖼</span><span class="drop-label">画像</span>
+          <span class="drop-hint">PNG / JPG / WEBP</span>
+          <div class="drop-filename" id="lyricImgName"></div>
+        </div>
+        <div class="drop-zone filled" style="cursor:default;opacity:0.55">
+          <span class="drop-icon">🎵</span>
+          <span class="drop-label" style="font-size:12px">音源はSTEP2で設定済み</span>
+          <span class="drop-hint">読み込み済みの音源を使用</span>
+        </div>
+      </div>
+      <div class="preview-section" id="lyricImgPreviewSection">
+        <div class="section-label">PREVIEW — IMAGE</div>
+        <img class="image-preview" id="lyricImgPreview" alt="">
+      </div>
+    </div>
+
+    <!-- 動画ゾーン -->
+    <div id="lyricVideoZoneWrap" style="display:none">
+      <div class="drop-zone" id="lyricVideoZone" style="margin-bottom:12px" onclick="document.getElementById('lyricVideoInput').click()">
+        <input type="file" id="lyricVideoInput" accept="video/*">
+        <span class="drop-icon">🎬</span><span class="drop-label">動画（無音）</span>
+        <span class="drop-hint">MP4 / MOV / WEBM</span>
+        <div class="drop-filename" id="lyricVideoName"></div>
+      </div>
+      <div class="preview-section" id="lyricVideoPreviewSection">
+        <div class="section-label">PREVIEW — VIDEO</div>
+        <video class="image-preview" id="lyricVideoPreview" controls playsinline muted style="aspect-ratio:auto;max-height:240px;"></video>
+      </div>
+      <div class="info-box">📐 動画の画角がそのままアスペクト比になります。</div>
+    </div>
+
+    <div class="info-box" style="margin-top:8px">
+      🎵 出力は<strong>音源の尺</strong>に合わせます。このままそのまま「合成する」を押してください。
     </div>
   </div>
 
@@ -398,25 +417,33 @@
 </div>
 
 <script>
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // STATE
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 let currentMode = 'image';
 let imgFile = null, audioFile = null, videoFile = null, audioFile2 = null;
+let lyricImgFile = null, lyricVideoFile = null, lyricAudioFile = null;
 let fadeEnabled = true;
-let lrcData = []; // [{time, text}]
-let lyricLines = [], lyricIndex = 0, lyricAudioFile = null;
+let lrcData = [];         // [{time, text}]
+let lyricLines = [];
+let lyricIndex = 0;
 let lyricStartTime = null, lyricTimerInterval = null;
 let lyricPhase = 'idle'; // idle | running | done
 
-// ════════════════════════════════════════
+const FONT_MAP = {
+  gothic: "'Hiragino Kaku Gothic ProN','Meiryo',sans-serif",
+  mincho: "'Hiragino Mincho ProN','Yu Mincho',serif",
+  maru:   "'Hiragino Maru Gothic ProN',sans-serif"
+};
+
+// ══════════════════════════════════════════════
 // MODE SWITCH
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 function switchMode(mode) {
   currentMode = mode;
-  document.getElementById('modeImage').style.display = mode === 'image' ? '' : 'none';
-  document.getElementById('modeVideo').style.display = mode === 'video' ? '' : 'none';
-  document.getElementById('modeLyric').style.display = mode === 'lyric' ? '' : 'none';
+  document.getElementById('modeImage').style.display  = mode === 'image'  ? '' : 'none';
+  document.getElementById('modeVideo').style.display  = mode === 'video'  ? '' : 'none';
+  document.getElementById('modeLyric').style.display  = mode === 'lyric'  ? '' : 'none';
   document.getElementById('tabImage').className = 'mode-tab' + (mode === 'image' ? ' active' : '');
   document.getElementById('tabVideo').className = 'mode-tab' + (mode === 'video' ? ' active' : '');
   document.getElementById('tabLyric').className = 'mode-tab' + (mode === 'lyric' ? ' active-orange' : '');
@@ -425,15 +452,25 @@ function switchMode(mode) {
   document.getElementById('progressWrap').classList.remove('show');
 }
 
-// ════════════════════════════════════════
-// DROP SETUP
-// ════════════════════════════════════════
+function switchLyricMediaType() {
+  const t = document.getElementById('lyricMediaType').value;
+  document.getElementById('lyricImageZoneWrap').style.display = t === 'image' ? '' : 'none';
+  document.getElementById('lyricVideoZoneWrap').style.display = t === 'video' ? '' : 'none';
+  document.getElementById('lyricAspectWrap').style.display    = t === 'image' ? '' : 'none';
+}
+
+// ══════════════════════════════════════════════
+// DROP HELPER
+// ══════════════════════════════════════════════
 function setupDrop(id, handler) {
   const el = document.getElementById(id);
   if (!el) return;
   el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('dragover'); });
   el.addEventListener('dragleave', () => el.classList.remove('dragover'));
-  el.addEventListener('drop', e => { e.preventDefault(); el.classList.remove('dragover'); const f = e.dataTransfer.files[0]; if (f) handler(f); });
+  el.addEventListener('drop', e => {
+    e.preventDefault(); el.classList.remove('dragover');
+    const f = e.dataTransfer.files[0]; if (f) handler(f);
+  });
 }
 
 // 画像モード
@@ -442,18 +479,18 @@ setupDrop('audioZone', f => handleAudio(f));
 document.getElementById('imgInput').addEventListener('change', e => { if (e.target.files[0]) handleImage(e.target.files[0]); });
 document.getElementById('audioInput').addEventListener('change', e => { if (e.target.files[0]) handleAudio(e.target.files[0]); });
 
-function handleImage(file) {
-  imgFile = file;
-  document.getElementById('imgName').textContent = file.name;
+function handleImage(f) {
+  imgFile = f;
+  document.getElementById('imgName').textContent = f.name;
   document.getElementById('imgZone').classList.add('filled');
-  document.getElementById('imgPreview').src = URL.createObjectURL(file);
+  document.getElementById('imgPreview').src = URL.createObjectURL(f);
   document.getElementById('imgPreviewSection').classList.add('show');
 }
-function handleAudio(file) {
-  audioFile = file;
-  document.getElementById('audioName').textContent = file.name;
+function handleAudio(f) {
+  audioFile = f;
+  document.getElementById('audioName').textContent = f.name;
   document.getElementById('audioZone').classList.add('filled');
-  document.getElementById('audioPreview').src = URL.createObjectURL(file);
+  document.getElementById('audioPreview').src = URL.createObjectURL(f);
   document.getElementById('audioPreviewSection').classList.add('show');
 }
 
@@ -463,35 +500,54 @@ setupDrop('audioZone2', f => handleAudio2(f));
 document.getElementById('videoInput').addEventListener('change', e => { if (e.target.files[0]) handleVideo(e.target.files[0]); });
 document.getElementById('audioInput2').addEventListener('change', e => { if (e.target.files[0]) handleAudio2(e.target.files[0]); });
 
-function handleVideo(file) {
-  videoFile = file;
-  document.getElementById('videoName').textContent = file.name;
+function handleVideo(f) {
+  videoFile = f;
+  document.getElementById('videoName').textContent = f.name;
   document.getElementById('videoZone').classList.add('filled');
-  document.getElementById('videoPreview').src = URL.createObjectURL(file);
+  document.getElementById('videoPreview').src = URL.createObjectURL(f);
   document.getElementById('videoPreviewSection').classList.add('show');
 }
-function handleAudio2(file) {
-  audioFile2 = file;
-  document.getElementById('audioName2').textContent = file.name;
+function handleAudio2(f) {
+  audioFile2 = f;
+  document.getElementById('audioName2').textContent = f.name;
   document.getElementById('audioZone2').classList.add('filled');
-  document.getElementById('audioPreview2').src = URL.createObjectURL(file);
+  document.getElementById('audioPreview2').src = URL.createObjectURL(f);
   document.getElementById('audioPreviewSection2').classList.add('show');
 }
 
-// 字幕タブ音源
+// 字幕タブ
 setupDrop('lyricAudioZone', f => handleLyricAudio(f));
+setupDrop('lyricImgZone',   f => handleLyricImg(f));
+setupDrop('lyricVideoZone', f => handleLyricVideo(f));
 document.getElementById('lyricAudioInput').addEventListener('change', e => { if (e.target.files[0]) handleLyricAudio(e.target.files[0]); });
-function handleLyricAudio(file) {
-  lyricAudioFile = file;
-  document.getElementById('lyricAudioName').textContent = file.name;
+document.getElementById('lyricImgInput').addEventListener('change',   e => { if (e.target.files[0]) handleLyricImg(e.target.files[0]); });
+document.getElementById('lyricVideoInput').addEventListener('change', e => { if (e.target.files[0]) handleLyricVideo(e.target.files[0]); });
+
+function handleLyricAudio(f) {
+  lyricAudioFile = f;
+  document.getElementById('lyricAudioName').textContent = f.name;
   document.getElementById('lyricAudioZone').classList.add('filled');
-  document.getElementById('lyricAudioPlayer').src = URL.createObjectURL(file);
+  document.getElementById('lyricAudioPlayer').src = URL.createObjectURL(f);
   document.getElementById('lyricTapBtn').disabled = false;
 }
+function handleLyricImg(f) {
+  lyricImgFile = f;
+  document.getElementById('lyricImgName').textContent = f.name;
+  document.getElementById('lyricImgZone').classList.add('filled');
+  document.getElementById('lyricImgPreview').src = URL.createObjectURL(f);
+  document.getElementById('lyricImgPreviewSection').classList.add('show');
+}
+function handleLyricVideo(f) {
+  lyricVideoFile = f;
+  document.getElementById('lyricVideoName').textContent = f.name;
+  document.getElementById('lyricVideoZone').classList.add('filled');
+  document.getElementById('lyricVideoPreview').src = URL.createObjectURL(f);
+  document.getElementById('lyricVideoPreviewSection').classList.add('show');
+}
 
-// ════════════════════════════════════════
-// 字幕タイミング：タップ
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
+// 字幕タップ
+// ══════════════════════════════════════════════
 document.addEventListener('keydown', e => {
   if (e.code === 'Space' && currentMode === 'lyric') { e.preventDefault(); onTap(); }
 });
@@ -499,8 +555,8 @@ document.addEventListener('keydown', e => {
 function onTap() {
   if (lyricPhase === 'idle') {
     lyricLines = document.getElementById('lyricInput').value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lyricLines.length === 0) { alert('歌詞を入力してください'); return; }
-    if (!lyricAudioFile) { alert('音源を読み込んでください'); return; }
+    if (!lyricLines.length) { alert('歌詞を入力してください'); return; }
+    if (!lyricAudioFile)    { alert('音源を読み込んでください'); return; }
 
     lyricIndex = 0; lrcData = [];
     lyricPhase = 'running';
@@ -512,10 +568,9 @@ function onTap() {
 
     lyricTimerInterval = setInterval(() => {
       const elapsed = (Date.now() - lyricStartTime) / 1000;
-      document.getElementById('lyricTimer').textContent = formatTime(elapsed);
-      if (player.duration) {
+      document.getElementById('lyricTimer').textContent = fmtTime(elapsed);
+      if (player.duration)
         document.getElementById('lyricProgressFill').style.width = (Math.min(elapsed / player.duration, 1) * 100) + '%';
-      }
     }, 100);
 
     player.onended = () => finalizeLrc();
@@ -542,25 +597,21 @@ function updateLyricDisplay() {
   document.getElementById('lyricCurrent').textContent = lyricLines[lyricIndex] || '— 完了 —';
   document.getElementById('lyricNext').textContent = '次: ' + (lyricLines[lyricIndex + 1] || '—');
 }
-
 function updateLyricList() {
   const list = document.getElementById('lyricList');
   list.innerHTML = lrcData.map(d =>
-    `<div class="lyric-item done"><span class="lyric-item-time">[${formatLrcTime(d.time)}]</span><span>${d.text}</span></div>`
+    `<div class="lyric-item done"><span class="lyric-item-time">[${fmtLrcTime(d.time)}]</span><span>${d.text}</span></div>`
   ).join('');
   list.scrollTop = list.scrollHeight;
 }
-
 function undoLyricTap() {
-  if (lrcData.length === 0) return;
+  if (!lrcData.length) return;
   lrcData.pop();
   lyricIndex = Math.max(0, lyricIndex - 1);
-  updateLyricDisplay();
-  updateLyricList();
+  updateLyricDisplay(); updateLyricList();
   document.getElementById('lyricTapBtn').disabled = false;
   document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
 }
-
 function resetLyricTap() {
   lyricPhase = 'idle'; lyricIndex = 0; lrcData = [];
   clearInterval(lyricTimerInterval);
@@ -577,128 +628,179 @@ function resetLyricTap() {
   document.getElementById('lrcResult').classList.remove('show');
   document.getElementById('lyricStatusLabel').textContent = '準備完了';
 }
-
 function finalizeLrc() {
   clearInterval(lyricTimerInterval);
   lyricPhase = 'done';
   document.getElementById('lyricAudioPlayer').pause();
   document.getElementById('lyricStatusLabel').textContent = '✅ タイミング完成！';
   document.getElementById('lyricDoneBtn').disabled = false;
-  const lrcText = lrcData.map(d => `[${formatLrcTime(d.time)}] ${d.text}`).join('\n');
-  document.getElementById('lrcPreview').textContent = lrcText;
+  document.getElementById('lrcPreview').textContent = lrcData.map(d => `[${fmtLrcTime(d.time)}] ${d.text}`).join('\n');
   document.getElementById('lrcResult').classList.add('show');
 }
 
-function formatTime(sec) {
+function fmtTime(sec) {
   const m = Math.floor(sec / 60);
   const s = (sec % 60).toFixed(1).padStart(4, '0');
   return `${m}:${s}`;
 }
-function formatLrcTime(sec) {
+function fmtLrcTime(sec) {
   const m = Math.floor(sec / 60);
   const s = (sec % 60).toFixed(2).padStart(5, '0');
   return `${String(m).padStart(2,'0')}:${s}`;
 }
 
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // 字幕プレビュー
-// ════════════════════════════════════════
-const FONT_MAP = {
-  gothic: "'Hiragino Kaku Gothic ProN','Meiryo',sans-serif",
-  mincho: "'Hiragino Mincho ProN','Yu Mincho',serif",
-  maru:   "'Hiragino Maru Gothic ProN',sans-serif"
-};
-
+// ══════════════════════════════════════════════
 function updateSubtitlePreview() {
-  const font = FONT_MAP[document.getElementById('subFont').value];
-  const size = document.getElementById('subSize').value;
-  const color = document.getElementById('subColor').value;
-  const bg = document.getElementById('subBg').value;
+  const font      = FONT_MAP[document.getElementById('subFont').value];
+  const size      = document.getElementById('subSize').value;
+  const color     = document.getElementById('subColor').value;
+  const bg        = document.getElementById('subBg').value;
   const direction = document.getElementById('subDirection').value;
-  const stroke = document.getElementById('subStroke').value;
-  const sizeMap = { S: '13px', M: '18px', L: '24px', XL: '30px' };
-  const bgMap = { none: 'transparent', dark: 'rgba(0,0,0,0.55)', light: 'rgba(255,255,255,0.55)' };
-  const strokeMap = { none: 'none', black: '-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000', white: '-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff' };
+  const stroke    = document.getElementById('subStroke').value;
+  const sizeMap   = { S:'13px', M:'18px', L:'24px', XL:'30px' };
+  const bgMap     = { none:'transparent', dark:'rgba(0,0,0,0.55)', light:'rgba(255,255,255,0.55)' };
+  const strokeMap = { none:'none', black:'-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000', white:'-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff' };
   const el = document.getElementById('subtitlePreviewText');
-  el.style.fontFamily = font;
-  el.style.fontSize = sizeMap[size];
-  el.style.color = color;
-  el.style.background = bgMap[bg];
-  el.style.padding = bg !== 'none' ? '5px 12px' : '0';
-  el.style.borderRadius = bg !== 'none' ? '4px' : '0';
-  el.style.textShadow = strokeMap[stroke];
+  el.style.fontFamily  = font;
+  el.style.fontSize    = sizeMap[size];
+  el.style.color       = color;
+  el.style.background  = bgMap[bg];
+  el.style.padding     = bg !== 'none' ? '5px 12px' : '0';
+  el.style.borderRadius= bg !== 'none' ? '4px' : '0';
+  el.style.textShadow  = strokeMap[stroke];
   el.style.writingMode = direction === 'vertical' ? 'vertical-rl' : 'horizontal-tb';
 }
 updateSubtitlePreview();
 
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // FADE / ERROR / PROGRESS
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 function toggleFade() { fadeEnabled = !fadeEnabled; document.getElementById('fadeToggle').classList.toggle('on', fadeEnabled); }
 function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = msg; el.classList.add('show'); }
 function clearError() { document.getElementById('errorMsg').classList.remove('show'); }
 function setProgress(pct, label, step) {
   document.getElementById('progressFill').style.width = pct + '%';
-  if (label) document.getElementById('progressLabel').textContent = label;
-  if (step !== undefined) document.getElementById('progressStep').textContent = step;
+  if (label !== undefined) document.getElementById('progressLabel').textContent = label;
+  if (step  !== undefined) document.getElementById('progressStep').textContent  = step;
 }
 
-// ════════════════════════════════════════
-// GENERATE
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
+// GENERATE（モード分岐）
+// ══════════════════════════════════════════════
 async function generate() {
   clearError();
-  if (currentMode === 'lyric') { showError('字幕タブでは合成できません。「画像 × 音源」または「動画 × 音源」タブに切り替えてください。'); return; }
   const btn = document.getElementById('generateBtn');
   btn.disabled = true;
   document.getElementById('progressWrap').classList.add('show');
   document.getElementById('resultSection').classList.remove('show');
   try {
-    if (currentMode === 'image') await generateImageMode();
-    else await generateVideoMode();
-  } catch (err) {
+    if      (currentMode === 'image') await generateImageMode();
+    else if (currentMode === 'video') await generateVideoMode();
+    else                              await generateLyricMode();
+  } catch(err) {
     console.error(err);
-    if (err.message) showError('エラー: ' + err.message);
+    if (err && err.message) showError('エラー: ' + err.message);
   } finally { btn.disabled = false; }
 }
 
+// ── 画像モード ──
 async function generateImageMode() {
-  if (!imgFile) { showError('画像ファイルを選択してください'); throw new Error(); }
+  if (!imgFile)   { showError('画像ファイルを選択してください'); throw new Error(); }
   if (!audioFile) { showError('音源ファイルを選択してください'); throw new Error(); }
+
   setProgress(10, '音源を読み込み中...', 'step 1 / 3');
   const duration = await getMediaDuration(audioFile, 'audio');
+
   setProgress(25, '画像を処理中...', 'step 2 / 3');
-  const { width, height } = getCanvasDimensions();
+  const { width, height } = getCanvasDimensions(
+    document.getElementById('aspectSelect').value,
+    document.getElementById('qualitySelect').value
+  );
   const canvas = document.getElementById('canvas');
   canvas.width = width; canvas.height = height;
-  const imageBitmap = await createImageBitmap(imgFile);
-  const ctx = canvas.getContext('2d');
-  drawCoverFit(ctx, imageBitmap, width, height);
+  const bmp = await createImageBitmap(imgFile);
+  drawCoverFit(canvas.getContext('2d'), bmp, width, height);
+
   setProgress(40, '動画を生成中...', 'step 3 / 3');
   await new Promise(r => setTimeout(r, 200));
-  const blob = await recordMain(canvas, imageBitmap, null, audioFile, duration);
+  const blob = await recordMain(canvas, bmp, null, audioFile, duration);
   finalize(blob, audioFile.name);
 }
 
+// ── 動画モード ──
 async function generateVideoMode() {
-  if (!videoFile) { showError('動画ファイルを選択してください'); throw new Error(); }
+  if (!videoFile)  { showError('動画ファイルを選択してください'); throw new Error(); }
   if (!audioFile2) { showError('音源ファイルを選択してください'); throw new Error(); }
+
   setProgress(10, '読み込み中...', 'step 1 / 3');
-  const vd = await getMediaDuration(videoFile, 'video');
+  const vd = await getMediaDuration(videoFile,  'video');
   const ad = await getMediaDuration(audioFile2, 'audio');
-  const duration = Math.min(vd, ad);
+  const duration = Math.min(vd, ad); // 短い方
+
   setProgress(30, '動画を準備中...', 'step 2 / 3');
   const srcVideo = document.createElement('video');
   srcVideo.src = URL.createObjectURL(videoFile);
   srcVideo.muted = true; srcVideo.playsInline = true;
   await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
+
   const canvas = document.getElementById('canvas');
-  canvas.width = srcVideo.videoWidth || 720;
+  canvas.width  = srcVideo.videoWidth  || 720;
   canvas.height = srcVideo.videoHeight || 1280;
+
   setProgress(40, '合成中...', 'step 3 / 3');
   await new Promise(r => setTimeout(r, 200));
   const blob = await recordMain(canvas, null, srcVideo, audioFile2, duration);
   finalize(blob, audioFile2.name);
+}
+
+// ── 字幕モード ──
+async function generateLyricMode() {
+  if (!lrcData.length)  { showError('字幕タイミングがまだ設定されていません（STEP 1〜3を完了してください）'); throw new Error(); }
+  if (!lyricAudioFile)  { showError('音源が読み込まれていません（STEP 2で設定してください）'); throw new Error(); }
+
+  const mediaType = document.getElementById('lyricMediaType').value;
+
+  setProgress(10, '音源を読み込み中...', 'step 1 / 3');
+  const duration = await getMediaDuration(lyricAudioFile, 'audio'); // 音源の尺を基準
+
+  if (mediaType === 'image') {
+    if (!lyricImgFile) { showError('画像をアップロードしてください（STEP 5）'); throw new Error(); }
+
+    setProgress(25, '画像を処理中...', 'step 2 / 3');
+    const { width, height } = getCanvasDimensions(
+      document.getElementById('lyricAspectSelect').value,
+      'mid' // 字幕モードは標準画質固定
+    );
+    const canvas = document.getElementById('canvas');
+    canvas.width = width; canvas.height = height;
+    const bmp = await createImageBitmap(lyricImgFile);
+    drawCoverFit(canvas.getContext('2d'), bmp, width, height);
+
+    setProgress(40, '動画を生成中...', 'step 3 / 3');
+    await new Promise(r => setTimeout(r, 200));
+    const blob = await recordMain(canvas, bmp, null, lyricAudioFile, duration);
+    finalize(blob, lyricAudioFile.name);
+
+  } else {
+    if (!lyricVideoFile) { showError('動画をアップロードしてください（STEP 5）'); throw new Error(); }
+
+    setProgress(25, '動画を準備中...', 'step 2 / 3');
+    const srcVideo = document.createElement('video');
+    srcVideo.src = URL.createObjectURL(lyricVideoFile);
+    srcVideo.muted = true; srcVideo.playsInline = true;
+    await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
+
+    const canvas = document.getElementById('canvas');
+    canvas.width  = srcVideo.videoWidth  || 720;
+    canvas.height = srcVideo.videoHeight || 1280;
+
+    setProgress(40, '合成中...', 'step 3 / 3');
+    await new Promise(r => setTimeout(r, 200));
+    const blob = await recordMain(canvas, null, srcVideo, lyricAudioFile, duration);
+    finalize(blob, lyricAudioFile.name);
+  }
 }
 
 function finalize(blob, nameBase) {
@@ -707,20 +809,20 @@ function finalize(blob, nameBase) {
   document.getElementById('resultVideo').src = url;
   const dl = document.getElementById('downloadLink');
   dl.href = url;
-  dl.download = `${nameBase.replace(/\.[^.]+$/, '')}_video.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`;
+  dl.download = nameBase.replace(/\.[^.]+$/, '') + '_video.' + (blob.type.includes('mp4') ? 'mp4' : 'webm');
   document.getElementById('resultSection').classList.add('show');
 }
 
-// ════════════════════════════════════════
-// 録画メイン（字幕描画込み）
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
+// 録画メイン（字幕描画ループ込み）
+// ══════════════════════════════════════════════
 function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
   return new Promise(async (resolve, reject) => {
     try {
       const ctx = canvas.getContext('2d');
       const W = canvas.width, H = canvas.height;
-      const hasSubtitle = lrcData.length > 0;
-      const subParams = hasSubtitle ? buildSubtitleParams(W, H) : null;
+      const hasSub = lrcData.length > 0;
+      const subP   = hasSub ? buildSubtitleParams(W, H) : null;
       let recording = true;
       let recordStart = null;
 
@@ -729,15 +831,15 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       function drawLoop() {
         if (!recording) return;
         if (imageBitmap) drawCoverFit(ctx, imageBitmap, W, H);
-        else ctx.drawImage(srcVideo, 0, 0, W, H);
-        if (hasSubtitle && recordStart !== null) {
-          drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subParams);
-        }
+        else             ctx.drawImage(srcVideo, 0, 0, W, H);
+        if (hasSub && recordStart !== null)
+          drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
         requestAnimationFrame(drawLoop);
       }
       drawLoop();
 
-      const blob = await doRecord(canvas, audioFile, duration,
+      const blob = await doRecord(
+        canvas, audioFile, duration,
         () => { recordStart = Date.now(); },
         () => { recording = false; if (srcVideo) srcVideo.pause(); }
       );
@@ -746,20 +848,20 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
   });
 }
 
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // 字幕描画
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 function buildSubtitleParams(W, H) {
-  const sizeKey = document.getElementById('subSize').value;
-  const sizeMap = { S: Math.round(H * 0.030), M: Math.round(H * 0.044), L: Math.round(H * 0.060), XL: Math.round(H * 0.080) };
+  const sizeKey  = document.getElementById('subSize').value;
+  const sizeMap  = { S: Math.round(H*.030), M: Math.round(H*.044), L: Math.round(H*.060), XL: Math.round(H*.080) };
   return {
     fontFamily: FONT_MAP[document.getElementById('subFont').value],
-    fontSize: sizeMap[sizeKey],
-    color: document.getElementById('subColor').value,
-    bg: document.getElementById('subBg').value,
-    position: document.getElementById('subPosition').value,
-    direction: document.getElementById('subDirection').value,
-    stroke: document.getElementById('subStroke').value,
+    fontSize:   sizeMap[sizeKey],
+    color:      document.getElementById('subColor').value,
+    bg:         document.getElementById('subBg').value,
+    position:   document.getElementById('subPosition').value,
+    direction:  document.getElementById('subDirection').value,
+    stroke:     document.getElementById('subStroke').value,
   };
 }
 
@@ -771,27 +873,28 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
   if (!text) return;
 
   ctx.save();
-  const fs = p.fontSize;
+  const fs  = p.fontSize;
+  const pad = Math.round(fs * .45);
   ctx.font = `bold ${fs}px ${p.fontFamily}`;
   ctx.textBaseline = 'alphabetic';
-  const pad = Math.round(fs * 0.45);
-  const strokeColors = { none: null, black: '#000000', white: '#ffffff' };
-  const bgColors = { none: null, dark: 'rgba(0,0,0,0.55)', light: 'rgba(255,255,255,0.6)' };
+
+  const bgColor     = { none: null, dark: 'rgba(0,0,0,0.55)', light: 'rgba(255,255,255,0.6)' }[p.bg];
+  const strokeColor = { none: null, black: '#000', white: '#fff' }[p.stroke];
 
   if (p.direction === 'horizontal') {
     const tw = ctx.measureText(text).width;
     const bw = tw + pad * 2, bh = fs * 1.4;
     const bx = (W - bw) / 2;
-    const by = p.position === 'top' ? H * 0.04 : p.position === 'center' ? (H - bh) / 2 : H - bh - H * 0.05;
+    const by = p.position === 'top' ? H*.04 : p.position === 'center' ? (H - bh) / 2 : H - bh - H*.05;
+    const ty = by + fs * 1.1;
 
-    if (bgColors[p.bg]) {
-      ctx.fillStyle = bgColors[p.bg];
+    if (bgColor) {
+      ctx.fillStyle = bgColor;
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
     }
-    const ty = by + fs + (bh - fs * 1.4) / 2 + fs * 0.2;
-    if (strokeColors[p.stroke]) {
-      ctx.strokeStyle = strokeColors[p.stroke];
-      ctx.lineWidth = Math.max(2, fs * 0.07); ctx.lineJoin = 'round';
+    if (strokeColor) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = Math.max(2, fs*.07); ctx.lineJoin = 'round';
       ctx.strokeText(text, bx + pad, ty);
     }
     ctx.fillStyle = p.color;
@@ -801,22 +904,21 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
     // 縦書き
     const chars = [...text];
     const ch = fs * 1.3;
-    const totalH = chars.length * ch;
-    const bw = fs + pad * 2, bh = totalH + pad * 2;
-    const bx = p.position === 'top' ? W * 0.04 : p.position === 'center' ? (W - bw) / 2 : W - bw - W * 0.04;
+    const bw = fs + pad * 2, bh = chars.length * ch + pad * 2;
+    const bx = p.position === 'top' ? W*.04 : p.position === 'center' ? (W - bw) / 2 : W - bw - W*.04;
     const by = (H - bh) / 2;
 
-    if (bgColors[p.bg]) {
-      ctx.fillStyle = bgColors[p.bg];
+    if (bgColor) {
+      ctx.fillStyle = bgColor;
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
     }
     ctx.textAlign = 'center';
     chars.forEach((c, i) => {
       const cx = bx + bw / 2;
       const cy = by + pad + i * ch + fs;
-      if (strokeColors[p.stroke]) {
-        ctx.strokeStyle = strokeColors[p.stroke];
-        ctx.lineWidth = Math.max(2, fs * 0.07); ctx.lineJoin = 'round';
+      if (strokeColor) {
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = Math.max(2, fs*.07); ctx.lineJoin = 'round';
         ctx.strokeText(c, cx, cy);
       }
       ctx.fillStyle = p.color;
@@ -826,33 +928,39 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
   ctx.restore();
 }
 
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // 共通録画
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 function doRecord(canvas, audioFile, duration, onStart, onStop) {
   return new Promise(async (resolve, reject) => {
     try {
       const audioCtx = new AudioContext();
-      const buf = await audioCtx.decodeAudioData(await audioFile.arrayBuffer());
+      const buf  = await audioCtx.decodeAudioData(await audioFile.arrayBuffer());
       const dest = audioCtx.createMediaStreamDestination();
       const gain = audioCtx.createGain();
       gain.connect(dest); gain.connect(audioCtx.destination);
+
       if (fadeEnabled && duration > 3) {
         gain.gain.setValueAtTime(1, audioCtx.currentTime);
         gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + duration - 3);
         gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
       }
+
       const source = audioCtx.createBufferSource();
       source.buffer = buf; source.connect(gain);
 
-      const stream = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const stream   = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      const mimes    = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
       const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
       const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      const chunks = [];
+      const chunks   = [];
 
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => { audioCtx.close(); if (onStop) onStop(); resolve(new Blob(chunks, { type: mimeType || 'video/webm' })); };
+      recorder.onstop = () => {
+        audioCtx.close();
+        if (onStop) onStop();
+        resolve(new Blob(chunks, { type: mimeType || 'video/webm' }));
+      };
       recorder.onerror = e => { audioCtx.close(); reject(e.error); };
 
       recorder.start(100);
@@ -860,7 +968,7 @@ function doRecord(canvas, audioFile, duration, onStart, onStop) {
       if (onStart) onStart();
       source.start(0);
 
-      const t0 = Date.now();
+      const t0   = Date.now();
       const prog = setInterval(() => {
         const e = (Date.now() - t0) / 1000;
         setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
@@ -878,9 +986,9 @@ function doRecord(canvas, audioFile, duration, onStart, onStop) {
   });
 }
 
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 // HELPERS
-// ════════════════════════════════════════
+// ══════════════════════════════════════════════
 function getMediaDuration(file, type) {
   return new Promise((resolve, reject) => {
     const el = document.createElement(type);
@@ -889,19 +997,17 @@ function getMediaDuration(file, type) {
     el.addEventListener('error', reject);
   });
 }
-function getCanvasDimensions() {
-  const aspect = document.getElementById('aspectSelect').value;
-  const quality = document.getElementById('qualitySelect').value;
+function getCanvasDimensions(aspect, quality) {
   const base = quality === 'high' ? 1080 : quality === 'mid' ? 720 : 480;
   if (aspect === '9:16') return { width: Math.round(base * 9/16), height: base };
-  if (aspect === '1:1') return { width: base, height: base };
+  if (aspect === '1:1')  return { width: base, height: base };
   return { width: base, height: Math.round(base * 9/16) };
 }
 function drawCoverFit(ctx, img, w, h) {
   const imgAR = img.width / img.height, cAR = w / h;
   let sw, sh, sx, sy;
   if (imgAR > cAR) { sh = img.height; sw = sh * cAR; sx = (img.width - sw) / 2; sy = 0; }
-  else { sw = img.width; sh = sw / cAR; sx = 0; sy = (img.height - sh) / 2; }
+  else             { sw = img.width;  sh = sw / cAR;  sx = 0; sy = (img.height - sh) / 2; }
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
 }
 </script>
