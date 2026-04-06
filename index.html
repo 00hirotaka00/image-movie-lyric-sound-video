@@ -314,7 +314,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
         <span class="drop-hint">MP4 / MOV / WEBM</span>
         <div class="drop-filename" id="lyricVideoName"></div>
       </div>
-      <video id="lyricVideoPreview" playsinline muted style="display:none;"></video>
+      <video id="lyricVideoPreview" playsinline muted style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
       <div class="info-box">📐 動画の画角がそのままアスペクト比になります。</div>
     </div>
 
@@ -1004,8 +1004,8 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       // 録画スタート → 音声スタート → recordStart記録（同期）
       recorder.start(100);
       await new Promise(r => setTimeout(r, 100));
+      recordStart = Date.now(); // ★ source.start前に記録（100ms待ち分を補正）
       source.start(0);
-      recordStart = Date.now(); // ★ 音声スタートと同時に記録
 
       const t0   = Date.now();
       const prog = setInterval(() => {
@@ -1052,7 +1052,9 @@ function buildSubtitleParams(W, H) {
 
 // アルファベット・数字・記号かどうか判定
 function isLatinChar(c) {
-  return /[a-zA-Z0-9!?.,\-'"\/#@&%+= ]/.test(c);
+  // 日本語の長音符（ー）や句読点は縦書き対象なので除外
+  // アルファベット・数字・ASCII記号のみ横倒し
+  return /[a-zA-Z0-9!?.,\-'"\/#@&%+= ]/.test(c) && !/[ーｰ\u30FC]/.test(c);
 }
 
 // 縦書き時に1文字ずつ描画（アルファベットは横倒しで縦配置）
