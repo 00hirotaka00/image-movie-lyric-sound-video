@@ -223,10 +223,24 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
   <!-- ═══ 字幕タイミング作成タブ ═══ -->
   <div id="modeLyric" style="display:none">
 
-    <div class="section-label">STEP 1 — 歌詞を入力（1行1センテンス）</div>
+    <div class="section-label">STEP 1 — タイトルを入力（任意）</div>
+    <div style="display:grid;grid-template-columns:1fr auto;gap:10px;align-items:end;margin-bottom:6px;">
+      <div>
+        <input type="text" id="lyricTitle" placeholder="例：春の風　/ Song Title" style="width:100%;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:15px;font-family:inherit;">
+      </div>
+      <div style="text-align:center;">
+        <label style="display:block;font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;white-space:nowrap;">表示秒数</label>
+        <input type="number" id="lyricTitleDuration" value="1.5" min="0.1" max="10" step="0.5" style="width:72px;border:1px solid var(--border);border-radius:8px;padding:8px 8px;font-size:14px;font-family:inherit;text-align:center;">
+      </div>
+    </div>
+    <div class="info-box" style="margin-bottom:14px">
+      🎬 動画冒頭にタイトルを表示します。スタイルはSTEP5の字幕設定が適用されます。空欄の場合はスキップされます。
+    </div>
+
+    <div class="section-label">STEP 2 — 歌詞を入力（1行1センテンス）</div>
     <textarea class="lyric-textarea" id="lyricInput" placeholder="朝の光の中で&#10;きみの声が聞こえた&#10;時計の針が止まる&#10;..."></textarea>
 
-    <div class="section-label" style="margin-top:14px">STEP 2 — 音源を読み込む</div>
+    <div class="section-label" style="margin-top:14px">STEP 3 — 音源を読み込む</div>
     <div class="drop-zone" id="lyricAudioZone" style="margin-bottom:12px" onclick="document.getElementById('lyricAudioInput').click()">
       <input type="file" id="lyricAudioInput" accept="audio/*">
       <span class="drop-icon">🎵</span>
@@ -236,7 +250,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
     </div>
     <audio id="lyricAudioPlayer" style="display:none"></audio>
 
-    <div class="section-label">STEP 3 — 再生しながらタップ</div>
+    <div class="section-label">STEP 4 — 再生しながらタップ</div>
     <div class="lyric-tap-area">
       <div class="lyric-tap-header">
         <span id="lyricStatusLabel">準備完了</span>
@@ -263,9 +277,9 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
       <div class="lrc-preview" id="lrcPreview"></div>
     </div>
 
-    <!-- STEP 4: 字幕スタイル -->
+    <!-- STEP 5: 字幕スタイル -->
     <div class="subtitle-settings">
-      <div class="subtitle-settings-title">🎨 STEP 4 — 字幕スタイル設定</div>
+      <div class="subtitle-settings-title">🎨 STEP 5 — 字幕スタイル設定</div>
       <div class="settings-grid">
         <div class="setting-item">
           <label>フォント</label>
@@ -329,7 +343,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
     <!-- STEP 5: 素材アップ & 合成 -->
     <div class="divider" style="margin:18px 0 14px"></div>
-    <div class="section-label">STEP 5 — 素材をアップして合成</div>
+    <div class="section-label">STEP 6 — 素材をアップして合成</div>
 
     <div class="options-grid" style="margin-bottom:12px">
       <div class="option-group">
@@ -576,7 +590,18 @@ function onTap() {
     player.onended = () => finalizeLrc();
     document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
     document.getElementById('lyricStatusLabel').textContent = '再生中 — タップで次の歌詞へ';
+
+    // 初回タップで1行目を即記録
+    lrcData.push({ time: 0, text: lyricLines[0] });
+    lyricIndex = 1;
     updateLyricDisplay();
+    updateLyricList();
+
+    if (lyricIndex >= lyricLines.length) {
+      document.getElementById('lyricTapBtn').textContent = '✅ 全行タップ完了！';
+      document.getElementById('lyricTapBtn').disabled = true;
+      document.getElementById('lyricDoneBtn').disabled = false;
+    }
 
   } else if (lyricPhase === 'running') {
     if (lyricIndex >= lyricLines.length) return;
@@ -821,9 +846,11 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
     try {
       const ctx = canvas.getContext('2d');
       const W = canvas.width, H = canvas.height;
-      const hasSub = lrcData.length > 0;
-      const subP   = hasSub ? buildSubtitleParams(W, H) : null;
-      let recording = true;
+      const hasSub      = lrcData.length > 0;
+      const subP        = (hasSub || true) ? buildSubtitleParams(W, H) : null; // タイトルにも使う
+      const titleText   = (document.getElementById('lyricTitle').value || '').trim();
+      const titleDur    = titleText ? parseFloat(document.getElementById('lyricTitleDuration').value) || 1.5 : 0;
+      let recording  = true;
       let recordStart = null;
 
       if (srcVideo) { srcVideo.currentTime = 0; await srcVideo.play(); }
@@ -832,8 +859,22 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
         if (!recording) return;
         if (imageBitmap) drawCoverFit(ctx, imageBitmap, W, H);
         else             ctx.drawImage(srcVideo, 0, 0, W, H);
-        if (hasSub && recordStart !== null)
-          drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
+        if (recordStart !== null) {
+          const elapsed = (Date.now() - recordStart) / 1000;
+          if (titleText && elapsed < titleDur) {
+            // タイトルをSTEP5スタイルで描画（フェードイン/アウト付き）
+            const fadeT = Math.min(titleDur * 0.3, 0.4);
+            let alpha = 1;
+            if (elapsed < fadeT) alpha = elapsed / fadeT;
+            else if (elapsed > titleDur - fadeT) alpha = (titleDur - elapsed) / fadeT;
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+            drawSubtitle(ctx, -1, W, H, subP, titleText); // elapsed=-1で強制表示
+            ctx.restore();
+          } else if (hasSub) {
+            drawSubtitle(ctx, elapsed - titleDur, W, H, subP);
+          }
+        }
         requestAnimationFrame(drawLoop);
       }
       drawLoop();
@@ -865,10 +906,12 @@ function buildSubtitleParams(W, H) {
   };
 }
 
-function drawSubtitle(ctx, elapsed, W, H, p) {
-  let text = null;
-  for (let i = lrcData.length - 1; i >= 0; i--) {
-    if (elapsed >= lrcData[i].time) { text = lrcData[i].text; break; }
+function drawSubtitle(ctx, elapsed, W, H, p, forceText) {
+  let text = forceText || null;
+  if (!text) {
+    for (let i = lrcData.length - 1; i >= 0; i--) {
+      if (elapsed >= lrcData[i].time) { text = lrcData[i].text; break; }
+    }
   }
   if (!text) return;
 
