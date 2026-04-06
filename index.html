@@ -143,8 +143,11 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
   <div class="mode-tabs">
     <button class="mode-tab active" id="tabImage" onclick="switchMode('image')">🖼 画像 × 音源</button>
     <button class="mode-tab" id="tabVideo" onclick="switchMode('video')">🎬 動画 × 音源</button>
-    <button class="mode-tab" id="tabLyric" onclick="switchMode('lyric')">🎤 字幕タイミング</button>
+    <button class="mode-tab" id="tabLyric" onclick="switchMode('lyric')">🎤 歌詞×画像/動画×音源</button>
   </div>
+
+  <!-- モード説明文 -->
+  <div id="modeDesc" style="font-size:12px;color:var(--muted);background:#f0f4ff;border-radius:8px;padding:10px 14px;margin-bottom:20px;line-height:1.6;"></div>
 
   <!-- ═══ 画像モード ═══ -->
   <div id="modeImage">
@@ -435,7 +438,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-04-07 02:33 JST";
+const DEPLOY_TIME = "2026-04-07 08:55 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -458,6 +461,12 @@ const FONT_MAP = {
   maru:   "'Hiragino Maru Gothic ProN',sans-serif"
 };
 
+const MODE_DESC = {
+  image: '画像と音源をアップロードして、ドッキングさせるだけのモード。',
+  video: '無音の動画と音源をアップロードして、ドッキングさせるだけのモード。',
+  lyric: '動画内で表示させたい歌詞（or テロップ・字幕）などの文字情報を音源に合わせてタイムスタンプをおこない、画像 または 動画と文字情報と音源をドッキングさせるモード。',
+};
+
 // ══════════════════════════════════════════════
 // MODE SWITCH
 // ══════════════════════════════════════════════
@@ -469,10 +478,14 @@ function switchMode(mode) {
   document.getElementById('tabImage').className = 'mode-tab' + (mode === 'image' ? ' active' : '');
   document.getElementById('tabVideo').className = 'mode-tab' + (mode === 'video' ? ' active' : '');
   document.getElementById('tabLyric').className = 'mode-tab' + (mode === 'lyric' ? ' active-orange' : '');
+  document.getElementById('modeDesc').textContent = MODE_DESC[mode] || '';
   clearError();
   document.getElementById('resultSection').classList.remove('show');
   document.getElementById('progressWrap').classList.remove('show');
 }
+
+// 初期表示時に説明文をセット
+document.addEventListener('DOMContentLoaded', () => switchMode('image'));
 
 function switchLyricMediaType() {
   const t = document.getElementById('lyricMediaType').value;
