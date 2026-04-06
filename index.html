@@ -852,8 +852,9 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
     try {
       const ctx = canvas.getContext('2d');
       const W = canvas.width, H = canvas.height;
+      // lrcDataが空でなければ常に字幕を描画
       const hasSub    = lrcData.length > 0;
-      const subP      = hasSub ? buildSubtitleParams(W, H) : null;
+      const subP      = buildSubtitleParams(W, H); // 常にビルド（hasSub判定はdrawSubtitle内で）
       let recording   = true;
       let recordStart = null;
 
@@ -863,7 +864,7 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
         if (!recording) return;
         if (imageBitmap) drawCoverFit(ctx, imageBitmap, W, H);
         else             ctx.drawImage(srcVideo, 0, 0, W, H);
-        if (hasSub && recordStart !== null)
+        if (recordStart !== null)
           drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
         requestAnimationFrame(drawLoop);
       }
