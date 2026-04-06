@@ -427,10 +427,18 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
     <a class="btn-download" id="downloadLink">ダウンロード</a>
   </div>
 
-  <div class="footer">image × sound → video &nbsp;/&nbsp; browser only</div>
+  <div class="footer">
+    image × sound → video &nbsp;/&nbsp; browser only
+    <span id="deployTime" style="display:block;margin-top:4px;font-size:10px;color:#aaa;"></span>
+  </div>
 </div>
 
 <script>
+// デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
+const DEPLOY_TIME = "2026-04-07 02:33 JST";
+if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
+  document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
+}
 // ══════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════
@@ -1052,18 +1060,35 @@ function buildSubtitleParams(W, H) {
 
 // アルファベット・数字・記号かどうか判定
 function isLatinChar(c) {
-  // 日本語の長音符（ー）や句読点は縦書き対象なので除外
-  // アルファベット・数字・ASCII記号のみ横倒し
-  return /[a-zA-Z0-9!?.,\-'"\/#@&%+= ]/.test(c) && !/[ーｰ\u30FC]/.test(c);
+  return /[a-zA-Z0-9!?.,\-'"\/#@&%+= ]/.test(c);
 }
 
-// 縦書き時に1文字ずつ描画（アルファベットは横倒しで縦配置）
+// 長音符・波ダッシュ系かどうか
+function isChoonpu(c) {
+  return /[ーｰ\u30FC\u2015\u2014\u2013～〜]/.test(c);
+}
+
+// 縦書き時に1文字ずつ描画
 function drawCharVertical(ctx, c, cx, cy, fs, color, strokeColor, strokeWidth) {
-  const isLatin = isLatinChar(c);
   ctx.save();
   ctx.translate(cx, cy);
-  if (isLatin) {
-    // アルファベットは90度回転して縦配置
+
+  if (isChoonpu(c)) {
+    // 長音符は縦棒として直接描画（回転せずに縦線で代替）
+    const barW = Math.max(2, fs * 0.08);
+    const barH = fs * 0.75;
+    const bx = -barW / 2;
+    const by = -barH / 2;
+    if (strokeColor) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth + 1;
+      ctx.strokeRect(bx, by, barW, barH);
+    }
+    ctx.fillStyle = color;
+    ctx.fillRect(bx, by, barW, barH);
+
+  } else if (isLatinChar(c)) {
+    // アルファベット・数字は90度回転
     ctx.rotate(Math.PI / 2);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1074,7 +1099,9 @@ function drawCharVertical(ctx, c, cx, cy, fs, color, strokeColor, strokeWidth) {
     }
     ctx.fillStyle = color;
     ctx.fillText(c, 0, 0);
+
   } else {
+    // 日本語・その他はそのまま縦配置
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     if (strokeColor) {
@@ -1085,6 +1112,7 @@ function drawCharVertical(ctx, c, cx, cy, fs, color, strokeColor, strokeWidth) {
     ctx.fillStyle = color;
     ctx.fillText(c, 0, 0);
   }
+
   ctx.restore();
 }
 
