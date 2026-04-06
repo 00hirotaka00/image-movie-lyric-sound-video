@@ -590,18 +590,7 @@ function onTap() {
     player.onended = () => finalizeLrc();
     document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
     document.getElementById('lyricStatusLabel').textContent = '再生中 — タップで次の歌詞へ';
-
-    // 初回タップで1行目を即記録
-    lrcData.push({ time: 0, text: lyricLines[0] });
-    lyricIndex = 1;
-    updateLyricDisplay();
-    updateLyricList();
-
-    if (lyricIndex >= lyricLines.length) {
-      document.getElementById('lyricTapBtn').textContent = '✅ 全行タップ完了！';
-      document.getElementById('lyricTapBtn').disabled = true;
-      document.getElementById('lyricDoneBtn').disabled = false;
-    }
+    updateLyricDisplay(); // 1行目を「次に来る歌詞」として表示するだけ、まだ記録しない
 
   } else if (lyricPhase === 'running') {
     if (lyricIndex >= lyricLines.length) return;
@@ -1008,8 +997,8 @@ function doRecord(canvas, audioFile, duration, onStart, onStop) {
 
       recorder.start(100);
       await new Promise(r => setTimeout(r, 100));
-      if (onStart) onStart();
       source.start(0);
+      if (onStart) onStart(); // source.start直後に呼ぶ（ズレをなくす）
 
       const t0   = Date.now();
       const prog = setInterval(() => {
