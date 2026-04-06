@@ -267,9 +267,60 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
       <div class="lrc-preview" id="lrcPreview"></div>
     </div>
 
-    <!-- STEP 5: 字幕スタイル -->
+    <!-- STEP 4: 素材アップ -->
+    <div class="divider" style="margin:18px 0 14px"></div>
+    <div class="section-label">STEP 4 — 素材をアップ</div>
+
+    <div class="options-grid" style="margin-bottom:12px">
+      <div class="option-group">
+        <label>素材タイプ</label>
+        <select id="lyricMediaType" onchange="switchLyricMediaType()">
+          <option value="image">🖼 画像に乗せる</option>
+          <option value="video">🎬 動画に乗せる</option>
+        </select>
+      </div>
+      <div class="option-group" id="lyricAspectWrap">
+        <label>アスペクト比</label>
+        <select id="lyricAspectSelect" onchange="renderSubtitlePreviewCanvas()">
+          <option value="9:16">9:16（TikTok縦）</option>
+          <option value="1:1">1:1（正方形）</option>
+          <option value="16:9">16:9（横）</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 画像ゾーン -->
+    <div id="lyricImageZoneWrap">
+      <div class="drop-grid">
+        <div class="drop-zone" id="lyricImgZone" onclick="document.getElementById('lyricImgInput').click()">
+          <input type="file" id="lyricImgInput" accept="image/*">
+          <span class="drop-icon">🖼</span><span class="drop-label">画像</span>
+          <span class="drop-hint">PNG / JPG / WEBP</span>
+          <div class="drop-filename" id="lyricImgName"></div>
+        </div>
+        <div class="drop-zone filled" style="cursor:default;opacity:0.55">
+          <span class="drop-icon">🎵</span>
+          <span class="drop-label" style="font-size:12px">音源はSTEP2で設定済み</span>
+          <span class="drop-hint">読み込み済みの音源を使用</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 動画ゾーン -->
+    <div id="lyricVideoZoneWrap" style="display:none">
+      <div class="drop-zone" id="lyricVideoZone" style="margin-bottom:12px" onclick="document.getElementById('lyricVideoInput').click()">
+        <input type="file" id="lyricVideoInput" accept="video/*">
+        <span class="drop-icon">🎬</span><span class="drop-label">動画（無音）</span>
+        <span class="drop-hint">MP4 / MOV / WEBM</span>
+        <div class="drop-filename" id="lyricVideoName"></div>
+      </div>
+      <div class="info-box">📐 動画の画角がそのままアスペクト比になります。</div>
+    </div>
+
+    <!-- STEP 5: 字幕スタイル設定 -->
+    <div class="divider" style="margin:18px 0 14px"></div>
     <div class="subtitle-settings">
-      <div class="subtitle-settings-title">🎨 STEP 4 — 字幕スタイル設定</div>
+      <div class="subtitle-settings-title">🎨 STEP 5 — 字幕スタイル設定</div>
       <div class="settings-grid">
         <div class="setting-item">
           <label>フォント</label>
@@ -328,70 +379,26 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
           </select>
         </div>
       </div>
+
+      <!-- テキストプレビュー（小） -->
       <div class="subtitle-preview-box">
         <div class="subtitle-preview-text" id="subtitlePreviewText">サンプル歌詞テキスト</div>
       </div>
-    </div>
 
-    <!-- STEP 5: 素材アップ & 合成 -->
-    <div class="divider" style="margin:18px 0 14px"></div>
-    <div class="section-label">STEP 5 — 素材をアップして合成</div>
-
-    <div class="options-grid" style="margin-bottom:12px">
-      <div class="option-group">
-        <label>素材タイプ</label>
-        <select id="lyricMediaType" onchange="switchLyricMediaType()">
-          <option value="image">🖼 画像に乗せる</option>
-          <option value="video">🎬 動画に乗せる</option>
-        </select>
-      </div>
-      <div class="option-group" id="lyricAspectWrap">
-        <label>アスペクト比</label>
-        <select id="lyricAspectSelect">
-          <option value="9:16">9:16（TikTok縦）</option>
-          <option value="1:1">1:1（正方形）</option>
-          <option value="16:9">16:9（横）</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- 画像ゾーン -->
-    <div id="lyricImageZoneWrap">
-      <div class="drop-grid">
-        <div class="drop-zone" id="lyricImgZone" onclick="document.getElementById('lyricImgInput').click()">
-          <input type="file" id="lyricImgInput" accept="image/*">
-          <span class="drop-icon">🖼</span><span class="drop-label">画像</span>
-          <span class="drop-hint">PNG / JPG / WEBP</span>
-          <div class="drop-filename" id="lyricImgName"></div>
+      <!-- Canvasリアルタイムプレビュー -->
+      <div id="subtitleCanvasPreviewWrap" style="display:none;margin-top:14px;">
+        <div class="section-label" style="margin-bottom:6px">CANVAS PREVIEW — 実際の表示イメージ</div>
+        <div style="position:relative;width:100%;background:#ccc;border-radius:8px;overflow:hidden;">
+          <canvas id="subtitlePreviewCanvas" style="width:100%;display:block;border-radius:8px;"></canvas>
+          <div style="position:absolute;bottom:8px;right:10px;font-size:10px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">PREVIEW</div>
         </div>
-        <div class="drop-zone filled" style="cursor:default;opacity:0.55">
-          <span class="drop-icon">🎵</span>
-          <span class="drop-label" style="font-size:12px">音源はSTEP2で設定済み</span>
-          <span class="drop-hint">読み込み済みの音源を使用</span>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          💬 表示する歌詞：<select id="previewLyricSelect" onchange="renderSubtitlePreviewCanvas()" style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-family:inherit;"></select>
         </div>
       </div>
-      <div class="preview-section" id="lyricImgPreviewSection">
-        <div class="section-label">PREVIEW — IMAGE</div>
-        <img class="image-preview" id="lyricImgPreview" alt="">
-      </div>
     </div>
 
-    <!-- 動画ゾーン -->
-    <div id="lyricVideoZoneWrap" style="display:none">
-      <div class="drop-zone" id="lyricVideoZone" style="margin-bottom:12px" onclick="document.getElementById('lyricVideoInput').click()">
-        <input type="file" id="lyricVideoInput" accept="video/*">
-        <span class="drop-icon">🎬</span><span class="drop-label">動画（無音）</span>
-        <span class="drop-hint">MP4 / MOV / WEBM</span>
-        <div class="drop-filename" id="lyricVideoName"></div>
-      </div>
-      <div class="preview-section" id="lyricVideoPreviewSection">
-        <div class="section-label">PREVIEW — VIDEO</div>
-        <video class="image-preview" id="lyricVideoPreview" controls playsinline muted style="aspect-ratio:auto;max-height:240px;"></video>
-      </div>
-      <div class="info-box">📐 動画の画角がそのままアスペクト比になります。</div>
-    </div>
-
-    <div class="info-box" style="margin-top:8px">
+    <div class="info-box" style="margin-top:14px">
       🎵 出力は<strong>音源の尺</strong>に合わせます。このままそのまま「合成する」を押してください。
     </div>
   </div>
@@ -540,15 +547,17 @@ function handleLyricImg(f) {
   lyricImgFile = f;
   document.getElementById('lyricImgName').textContent = f.name;
   document.getElementById('lyricImgZone').classList.add('filled');
-  document.getElementById('lyricImgPreview').src = URL.createObjectURL(f);
-  document.getElementById('lyricImgPreviewSection').classList.add('show');
+  renderSubtitlePreviewCanvas();
 }
 function handleLyricVideo(f) {
   lyricVideoFile = f;
   document.getElementById('lyricVideoName').textContent = f.name;
   document.getElementById('lyricVideoZone').classList.add('filled');
-  document.getElementById('lyricVideoPreview').src = URL.createObjectURL(f);
-  document.getElementById('lyricVideoPreviewSection').classList.add('show');
+  // プレビュー用videoにソースをセット
+  const vid = document.getElementById('lyricVideoPreview');
+  vid.src = URL.createObjectURL(f);
+  vid.addEventListener('loadeddata', () => renderSubtitlePreviewCanvas(), { once: true });
+  renderSubtitlePreviewCanvas();
 }
 
 // ══════════════════════════════════════════════
@@ -672,6 +681,8 @@ function finalizeLrc() {
   document.getElementById('lyricDoneBtn').disabled = false;
   document.getElementById('lrcPreview').textContent = lrcData.map(d => `[${fmtLrcTime(d.time)}] ${d.text}`).join('\n');
   document.getElementById('lrcResult').classList.add('show');
+  // 歌詞確定後にCanvasプレビューの歌詞セレクトを更新
+  renderSubtitlePreviewCanvas();
 }
 
 function fmtTime(sec) {
@@ -689,6 +700,7 @@ function fmtLrcTime(sec) {
 // 字幕プレビュー
 // ══════════════════════════════════════════════
 function updateSubtitlePreview() {
+  // テキストプレビュー（小）
   const font      = FONT_MAP[document.getElementById('subFont').value];
   const size      = document.getElementById('subSize').value;
   const color     = document.getElementById('subColor').value;
@@ -707,11 +719,88 @@ function updateSubtitlePreview() {
   el.style.borderRadius= bg !== 'none' ? '4px' : '0';
   el.style.textShadow  = strokeMap[stroke];
   el.style.writingMode = direction === 'vertical' ? 'vertical-rl' : 'horizontal-tb';
+
+  // Canvasプレビューも更新
+  renderSubtitlePreviewCanvas();
 }
 updateSubtitlePreview();
 
 // ══════════════════════════════════════════════
-// FADE / ERROR / PROGRESS
+// Canvasリアルタイムプレビュー
+// ══════════════════════════════════════════════
+async function renderSubtitlePreviewCanvas() {
+  const mediaType = document.getElementById('lyricMediaType') ?
+    document.getElementById('lyricMediaType').value : 'image';
+  const hasImg   = mediaType === 'image' && lyricImgFile;
+  const hasVideo = mediaType === 'video' && lyricVideoFile;
+  const wrap     = document.getElementById('subtitleCanvasPreviewWrap');
+
+  if (!hasImg && !hasVideo) { wrap.style.display = 'none'; return; }
+
+  wrap.style.display = 'block';
+
+  // 歌詞セレクト更新
+  const sel = document.getElementById('previewLyricSelect');
+  if (lrcData.length > 0) {
+    const cur = sel.value;
+    sel.innerHTML = lrcData.map((d, i) =>
+      `<option value="${i}">${d.text.substring(0, 20)}</option>`
+    ).join('');
+    if (cur && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
+  } else {
+    sel.innerHTML = '<option value="">（歌詞なし）</option>';
+  }
+
+  const pc = document.getElementById('subtitlePreviewCanvas');
+  const aspect = document.getElementById('lyricAspectSelect') ?
+    document.getElementById('lyricAspectSelect').value : '9:16';
+
+  // Canvas解像度（プレビュー用に小さめ）
+  const PH = 600;
+  let PW;
+  if (aspect === '9:16') PW = Math.round(PH * 9/16);
+  else if (aspect === '1:1') PW = PH;
+  else PW = Math.round(PH * 16/9);
+
+  pc.width = PW; pc.height = PH;
+  const ctx = pc.getContext('2d');
+
+  // 背景描画
+  if (hasImg) {
+    const bmp = await createImageBitmap(lyricImgFile);
+    drawCoverFit(ctx, bmp, PW, PH);
+  } else if (hasVideo) {
+    const vid = document.getElementById('lyricVideoPreview');
+    if (vid.readyState >= 2) {
+      ctx.drawImage(vid, 0, 0, PW, PH);
+    } else {
+      ctx.fillStyle = '#888';
+      ctx.fillRect(0, 0, PW, PH);
+      ctx.fillStyle = '#fff';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('動画を読み込み中...', PW/2, PH/2);
+    }
+  }
+
+  // 字幕描画
+  const subP = buildSubtitleParams(PW, PH);
+  const selIdx = parseInt(sel.value) || 0;
+  if (lrcData.length > 0) {
+    const previewText = lrcData[selIdx] ? lrcData[selIdx].text : lrcData[0].text;
+    // 一時的にlrcDataを差し替えてdrawSubtitleを使う
+    const origLrcData = lrcData;
+    lrcData = [{ time: 0, text: previewText }];
+    drawSubtitle(ctx, 0, PW, PH, subP);
+    lrcData = origLrcData;
+  } else {
+    // 歌詞がない場合はサンプルテキスト
+    const origLrcData = lrcData;
+    lrcData = [{ time: 0, text: 'サンプル歌詞テキスト' }];
+    drawSubtitle(ctx, 0, PW, PH, subP);
+    lrcData = origLrcData;
+  }
+}
 // ══════════════════════════════════════════════
 function toggleFade() { fadeEnabled = !fadeEnabled; document.getElementById('fadeToggle').classList.toggle('on', fadeEnabled); }
 function showError(msg) { const el = document.getElementById('errorMsg'); el.textContent = msg; el.classList.add('show'); }
