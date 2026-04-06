@@ -282,6 +282,8 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
         <div class="setting-item">
           <label>文字サイズ</label>
           <select id="subSize" onchange="updateSubtitlePreview()">
+            <option value="XXS">XXS（極小）</option>
+            <option value="XS">XS（特小）</option>
             <option value="S" selected>S（小）</option>
             <option value="M">M（中）</option>
             <option value="L">L（大）</option>
@@ -690,7 +692,7 @@ function updateSubtitlePreview() {
   const bg        = document.getElementById('subBg').value;
   const direction = document.getElementById('subDirection').value;
   const stroke    = document.getElementById('subStroke').value;
-  const sizeMap   = { S:'13px', M:'18px', L:'24px', XL:'30px' };
+  const sizeMap   = { XXS:'9px', XS:'12px', S:'13px', M:'18px', L:'24px', XL:'30px' };
   const bgMap     = { none:'transparent', dark:'rgba(0,0,0,0.55)', light:'rgba(255,255,255,0.55)' };
   const strokeMap = { none:'none', black:'-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000', white:'-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff' };
   const el = document.getElementById('subtitlePreviewText');
@@ -885,7 +887,14 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
 // ══════════════════════════════════════════════
 function buildSubtitleParams(W, H) {
   const sizeKey  = document.getElementById('subSize').value;
-  const sizeMap  = { S: Math.round(H*.030), M: Math.round(H*.044), L: Math.round(H*.060), XL: Math.round(H*.080) };
+  const sizeMap  = {
+    XXS: Math.round(H*.016),
+    XS:  Math.round(H*.022),
+    S:   Math.round(H*.030),
+    M:   Math.round(H*.044),
+    L:   Math.round(H*.060),
+    XL:  Math.round(H*.080)
+  };
   return {
     fontFamily: FONT_MAP[document.getElementById('subFont').value],
     fontSize:   sizeMap[sizeKey],
@@ -895,6 +904,42 @@ function buildSubtitleParams(W, H) {
     direction:  document.getElementById('subDirection').value,
     stroke:     document.getElementById('subStroke').value,
   };
+}
+
+// アルファベット・数字・記号かどうか判定
+function isLatinChar(c) {
+  return /[a-zA-Z0-9!?.,\-'"\/#@&%+= ]/.test(c);
+}
+
+// 縦書き時に1文字ずつ描画（アルファベットは横倒しで縦配置）
+function drawCharVertical(ctx, c, cx, cy, fs, color, strokeColor, strokeWidth) {
+  const isLatin = isLatinChar(c);
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (isLatin) {
+    // アルファベットは90度回転して縦配置
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (strokeColor) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth; ctx.lineJoin = 'round';
+      ctx.strokeText(c, 0, 0);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(c, 0, 0);
+  } else {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (strokeColor) {
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = strokeWidth; ctx.lineJoin = 'round';
+      ctx.strokeText(c, 0, 0);
+    }
+    ctx.fillStyle = color;
+    ctx.fillText(c, 0, 0);
+  }
+  ctx.restore();
 }
 
 function drawSubtitle(ctx, elapsed, W, H, p) {
@@ -912,6 +957,7 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
 
   const bgColor     = { none: null, dark: 'rgba(0,0,0,0.55)', light: 'rgba(255,255,255,0.6)' }[p.bg];
   const strokeColor = { none: null, black: '#000', white: '#fff' }[p.stroke];
+  const strokeWidth = Math.max(2, fs * .07);
 
   if (p.direction === 'horizontal') {
     const tw = ctx.measureText(text).width;
@@ -926,17 +972,18 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
     }
     if (strokeColor) {
       ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = Math.max(2, fs*.07); ctx.lineJoin = 'round';
+      ctx.lineWidth = strokeWidth; ctx.lineJoin = 'round';
       ctx.strokeText(text, bx + pad, ty);
     }
     ctx.fillStyle = p.color;
     ctx.fillText(text, bx + pad, ty);
 
   } else {
-    // 縦書き
+    // 縦書き：1文字ずつ描画、アルファベットは90度回転
     const chars = [...text];
     const ch = fs * 1.3;
-    const bw = fs + pad * 2, bh = chars.length * ch + pad * 2;
+    const bw = fs + pad * 2;
+    const bh = chars.length * ch + pad * 2;
     const bx = p.position === 'top' ? W*.04 : p.position === 'center' ? (W - bw) / 2 : W - bw - W*.04;
     const by = (H - bh) / 2;
 
@@ -944,17 +991,12 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
       ctx.fillStyle = bgColor;
       ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 4); ctx.fill();
     }
-    ctx.textAlign = 'center';
+
+    ctx.font = `bold ${fs}px ${p.fontFamily}`;
     chars.forEach((c, i) => {
       const cx = bx + bw / 2;
-      const cy = by + pad + i * ch + fs;
-      if (strokeColor) {
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = Math.max(2, fs*.07); ctx.lineJoin = 'round';
-        ctx.strokeText(c, cx, cy);
-      }
-      ctx.fillStyle = p.color;
-      ctx.fillText(c, cx, cy);
+      const cy = by + pad + i * ch + ch / 2;
+      drawCharVertical(ctx, c, cx, cy, fs, p.color, strokeColor, strokeWidth);
     });
   }
   ctx.restore();
