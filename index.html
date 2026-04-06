@@ -252,7 +252,11 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
     <div class="lyric-controls">
       <button class="btn-sm" onclick="resetLyricTap()">🔄 リセット</button>
-      <button class="btn-sm" onclick="undoLyricTap()">↩ 1つ戻す</button>
+      <button class="btn-sm" onclick="rewindLyric(10)">◀ 10秒戻す</button>
+      <button class="btn-sm" onclick="rewindLyric(5)">◀ 5秒戻す</button>
+      <button class="btn-sm" onclick="undoLyricTap()">↩ 1つ取消</button>
+    </div>
+    <div class="lyric-controls" style="margin-top:0">
       <button class="btn-sm done-btn" id="lyricDoneBtn" onclick="finalizeLrc()" disabled>✅ 完成・字幕に使う</button>
     </div>
 
@@ -271,28 +275,28 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
           <label>フォント</label>
           <select id="subFont" onchange="updateSubtitlePreview()">
             <option value="gothic">ゴシック</option>
-            <option value="mincho">明朝</option>
+            <option value="mincho" selected>明朝</option>
             <option value="maru">丸ゴシック</option>
           </select>
         </div>
         <div class="setting-item">
           <label>文字サイズ</label>
           <select id="subSize" onchange="updateSubtitlePreview()">
-            <option value="S">S（小）</option>
-            <option value="M" selected>M（中）</option>
+            <option value="S" selected>S（小）</option>
+            <option value="M">M（中）</option>
             <option value="L">L（大）</option>
             <option value="XL">XL（特大）</option>
           </select>
         </div>
         <div class="setting-item">
           <label>文字色</label>
-          <input type="color" id="subColor" value="#ffffff" onchange="updateSubtitlePreview()">
+          <input type="color" id="subColor" value="#636363" onchange="updateSubtitlePreview()">
         </div>
         <div class="setting-item">
           <label>背景</label>
           <select id="subBg" onchange="updateSubtitlePreview()">
-            <option value="none">なし</option>
-            <option value="dark" selected>半透明黒帯</option>
+            <option value="none" selected>なし</option>
+            <option value="dark">半透明黒帯</option>
             <option value="light">半透明白帯</option>
           </select>
         </div>
@@ -302,22 +306,22 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
           <label>縦位置</label>
           <select id="subPosition" onchange="updateSubtitlePreview()">
             <option value="top">上部</option>
-            <option value="center">中央</option>
-            <option value="bottom" selected>下部</option>
+            <option value="center" selected>中央</option>
+            <option value="bottom">下部</option>
           </select>
         </div>
         <div class="setting-item">
           <label>書き方向</label>
           <select id="subDirection" onchange="updateSubtitlePreview()">
             <option value="horizontal">横書き</option>
-            <option value="vertical">縦書き</option>
+            <option value="vertical" selected>縦書き</option>
           </select>
         </div>
         <div class="setting-item">
           <label>縁取り</label>
           <select id="subStroke" onchange="updateSubtitlePreview()">
-            <option value="none">なし</option>
-            <option value="black" selected>黒縁</option>
+            <option value="none" selected>なし</option>
+            <option value="black">黒縁</option>
             <option value="white">白縁</option>
           </select>
         </div>
@@ -611,6 +615,33 @@ function undoLyricTap() {
   updateLyricDisplay(); updateLyricList();
   document.getElementById('lyricTapBtn').disabled = false;
   document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
+}
+
+function rewindLyric(seconds) {
+  if (lyricPhase !== 'running') return;
+  const player = document.getElementById('lyricAudioPlayer');
+
+  // 巻き戻し後の時刻
+  const newTime = Math.max(0, player.currentTime - seconds);
+  player.currentTime = newTime;
+
+  // lyricStartTimeを巻き戻し量だけ後ろにずらす
+  lyricStartTime = Date.now() - newTime * 1000;
+
+  // newTime以降に打ったタイムスタンプを削除
+  const before = lrcData.length;
+  lrcData = lrcData.filter(d => d.time < newTime);
+  lyricIndex = lrcData.length;
+
+  updateLyricDisplay();
+  updateLyricList();
+
+  // 完了状態だったら戻す
+  if (before > lrcData.length) {
+    document.getElementById('lyricTapBtn').disabled = false;
+    document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
+    document.getElementById('lyricDoneBtn').disabled = true;
+  }
 }
 function resetLyricTap() {
   lyricPhase = 'idle'; lyricIndex = 0; lrcData = [];
