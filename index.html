@@ -314,6 +314,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
         <span class="drop-hint">MP4 / MOV / WEBM</span>
         <div class="drop-filename" id="lyricVideoName"></div>
       </div>
+      <video id="lyricVideoPreview" playsinline muted style="display:none;"></video>
       <div class="info-box">📐 動画の画角がそのままアスペクト比になります。</div>
     </div>
 
@@ -946,14 +947,34 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
     try {
       const ctx = canvas.getContext('2d');
       const W = canvas.width, H = canvas.height;
-      // lrcDataが空でなければ常に字幕を描画
-      const hasSub    = lrcData.length > 0;
-      const subP      = buildSubtitleParams(W, H); // 常にビルド（hasSub判定はdrawSubtitle内で）
+      const subP = buildSubtitleParams(W, H);
       let recording   = true;
       let recordStart = null;
 
-      if (srcVideo) { srcVideo.currentTime = 0; await srcVideo.play(); }
+      // ★ 音声を先にデコードしてから動画再生・録画を開始（動画停止バグ対策）
+      const audioCtx = new AudioContext();
+      const buf  = await audioCtx.decodeAudioData(await audioFile.arrayBuffer());
+      const dest = audioCtx.createMediaStreamDestination();
+      const gain = audioCtx.createGain();
+      gain.connect(dest); gain.connect(audioCtx.destination);
 
+      if (fadeEnabled && duration > 3) {
+        gain.gain.setValueAtTime(1, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + duration - 3);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
+      }
+
+      const source = audioCtx.createBufferSource();
+      source.buffer = buf; source.connect(gain);
+
+      // 動画を先頭に戻して再生準備
+      if (srcVideo) {
+        srcVideo.currentTime = 0;
+        await new Promise(res => { srcVideo.onseeked = res; });
+        await srcVideo.play();
+      }
+
+      // drawLoop 開始
       function drawLoop() {
         if (!recording) return;
         if (imageBitmap) drawCoverFit(ctx, imageBitmap, W, H);
@@ -964,12 +985,43 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       }
       drawLoop();
 
-      const blob = await doRecord(
-        canvas, audioFile, duration,
-        () => { recordStart = Date.now(); },
-        () => { recording = false; if (srcVideo) srcVideo.pause(); }
-      );
-      resolve(blob);
+      // MediaRecorder セットアップ
+      const stream   = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...dest.stream.getAudioTracks()]);
+      const mimes    = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      const chunks   = [];
+
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        recording = false;
+        audioCtx.close();
+        if (srcVideo) srcVideo.pause();
+        resolve(new Blob(chunks, { type: mimeType || 'video/webm' }));
+      };
+      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
+
+      // 録画スタート → 音声スタート → recordStart記録（同期）
+      recorder.start(100);
+      await new Promise(r => setTimeout(r, 100));
+      source.start(0);
+      recordStart = Date.now(); // ★ 音声スタートと同時に記録
+
+      const t0   = Date.now();
+      const prog = setInterval(() => {
+        const e = (Date.now() - t0) / 1000;
+        setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
+      }, 500);
+
+      const forceStop = setTimeout(() => {
+        if (recorder.state === 'recording') { clearInterval(prog); recorder.stop(); stream.getTracks().forEach(t => t.stop()); }
+      }, duration * 1000 + 400);
+
+      source.onended = () => {
+        clearInterval(prog); clearTimeout(forceStop);
+        if (recorder.state === 'recording') { recorder.stop(); stream.getTracks().forEach(t => t.stop()); }
+      };
+
     } catch(e) { reject(e); }
   });
 }
@@ -1097,61 +1149,6 @@ function drawSubtitle(ctx, elapsed, W, H, p) {
 // ══════════════════════════════════════════════
 // 共通録画
 // ══════════════════════════════════════════════
-function doRecord(canvas, audioFile, duration, onStart, onStop) {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const audioCtx = new AudioContext();
-      const buf  = await audioCtx.decodeAudioData(await audioFile.arrayBuffer());
-      const dest = audioCtx.createMediaStreamDestination();
-      const gain = audioCtx.createGain();
-      gain.connect(dest); gain.connect(audioCtx.destination);
-
-      if (fadeEnabled && duration > 3) {
-        gain.gain.setValueAtTime(1, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(1, audioCtx.currentTime + duration - 3);
-        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + duration);
-      }
-
-      const source = audioCtx.createBufferSource();
-      source.buffer = buf; source.connect(gain);
-
-      const stream   = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...dest.stream.getAudioTracks()]);
-      const mimes    = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
-      const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      const chunks   = [];
-
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => {
-        audioCtx.close();
-        if (onStop) onStop();
-        resolve(new Blob(chunks, { type: mimeType || 'video/webm' }));
-      };
-      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
-
-      recorder.start(100);
-      await new Promise(r => setTimeout(r, 100));
-      source.start(0);
-      if (onStart) onStart(); // source.start直後に呼ぶ（ズレをなくす）
-
-      const t0   = Date.now();
-      const prog = setInterval(() => {
-        const e = (Date.now() - t0) / 1000;
-        setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
-      }, 500);
-
-      const forceStop = setTimeout(() => {
-        if (recorder.state === 'recording') { clearInterval(prog); recorder.stop(); stream.getTracks().forEach(t => t.stop()); }
-      }, duration * 1000 + 400);
-
-      source.onended = () => {
-        clearInterval(prog); clearTimeout(forceStop);
-        if (recorder.state === 'recording') { recorder.stop(); stream.getTracks().forEach(t => t.stop()); }
-      };
-    } catch(e) { reject(e); }
-  });
-}
-
 // ══════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════
