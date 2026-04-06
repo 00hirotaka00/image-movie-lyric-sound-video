@@ -103,7 +103,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 .setting-item label { display: block; font-size: 11px; font-weight: 700; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
 .setting-item select { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-size: 12px; font-family: inherit; background: var(--surface); cursor: pointer; }
 .setting-item input[type="color"] { width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 3px; height: 34px; cursor: pointer; }
-.subtitle-preview-box { margin-top: 12px; background: #222; border-radius: 8px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.subtitle-preview-box { margin-top: 12px; background: #e8e8e8; border-radius: 8px; height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .subtitle-preview-text { text-align: center; padding: 0 12px; }
 
 /* common */
@@ -623,27 +623,30 @@ function rewindLyric(seconds) {
   if (lyricPhase !== 'running') return;
   const player = document.getElementById('lyricAudioPlayer');
 
-  // 巻き戻し後の時刻
   const newTime = Math.max(0, player.currentTime - seconds);
-  player.currentTime = newTime;
 
-  // lyricStartTimeを巻き戻し量だけ後ろにずらす
-  lyricStartTime = Date.now() - newTime * 1000;
+  // seeked後に正確なcurrentTimeでlyricStartTimeを再設定
+  player.addEventListener('seeked', function onSeeked() {
+    player.removeEventListener('seeked', onSeeked);
+    // シーク完了後の実際の再生位置を使う
+    lyricStartTime = Date.now() - player.currentTime * 1000;
 
-  // newTime以降に打ったタイムスタンプを削除
-  const before = lrcData.length;
-  lrcData = lrcData.filter(d => d.time < newTime);
-  lyricIndex = lrcData.length;
+    // player.currentTime以降に打ったタイムスタンプを削除
+    const before = lrcData.length;
+    lrcData = lrcData.filter(d => d.time < player.currentTime);
+    lyricIndex = lrcData.length;
 
-  updateLyricDisplay();
-  updateLyricList();
+    updateLyricDisplay();
+    updateLyricList();
 
-  // 完了状態だったら戻す
-  if (before > lrcData.length) {
-    document.getElementById('lyricTapBtn').disabled = false;
-    document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
-    document.getElementById('lyricDoneBtn').disabled = true;
-  }
+    if (before > lrcData.length) {
+      document.getElementById('lyricTapBtn').disabled = false;
+      document.getElementById('lyricTapBtn').textContent = '👆 タップ（スペースキー可）';
+      document.getElementById('lyricDoneBtn').disabled = true;
+    }
+  }, { once: true });
+
+  player.currentTime = newTime; // seekedイベントをトリガー
 }
 function resetLyricTap() {
   lyricPhase = 'idle'; lyricIndex = 0; lrcData = [];
