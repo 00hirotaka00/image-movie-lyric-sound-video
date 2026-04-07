@@ -438,7 +438,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-04-07 08:55 JST";
+const DEPLOY_TIME = "2026-04-07 11:15 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -988,8 +988,9 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       const source = audioCtx.createBufferSource();
       source.buffer = buf; source.connect(gain);
 
-      // 動画を先頭に戻して再生準備
+      // 動画を先頭に戻して再生準備、ループ設定
       if (srcVideo) {
+        srcVideo.loop = true; // ★ 自動ループON
         srcVideo.currentTime = 0;
         await new Promise(res => { srcVideo.onseeked = res; });
         await srcVideo.play();
@@ -1017,7 +1018,7 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       recorder.onstop = () => {
         recording = false;
         audioCtx.close();
-        if (srcVideo) srcVideo.pause();
+        if (srcVideo) { srcVideo.pause(); srcVideo.loop = false; }
         resolve(new Blob(chunks, { type: mimeType || 'video/webm' }));
       };
       recorder.onerror = e => { audioCtx.close(); reject(e.error); };
