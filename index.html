@@ -22,7 +22,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 /* tabs */
 .mode-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 24px; }
-.mode-tab { padding: 10px 2px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-family: inherit; font-size: 10px; font-weight: 600; cursor: pointer; transition: all .2s; line-height: 1.4; }
+.mode-tab { padding: 10px 4px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; line-height: 1.4; }
 .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
 .mode-tab.active { border-color: var(--accent); background: var(--accent); color: #fff; }
 .mode-tab.active-orange { border-color: var(--orange); background: var(--orange); color: #fff; }
@@ -137,15 +137,15 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
   <div class="header">
     <div class="header-mark">video composer</div>
-    <h1>image × sound → video</h1>
+    <h1>Easily create videos in your browser</h1>
   </div>
 
   <!-- タブ -->
   <div class="mode-tabs">
-    <button class="mode-tab active" id="tabImage" onclick="switchMode('image')">🖼 画像 × 音源</button>
-    <button class="mode-tab" id="tabVideo" onclick="switchMode('video')">🎬 動画 × 音源</button>
-    <button class="mode-tab" id="tabLyric" onclick="switchMode('lyric')">🎤 歌詞×画像/動画×音源</button>
     <button class="mode-tab" id="tabCaption" onclick="switchMode('caption')">🎙 動画字幕</button>
+    <button class="mode-tab" id="tabLyric" onclick="switchMode('lyric')">🎤 歌詞×画像/動画×音源</button>
+    <button class="mode-tab" id="tabVideo" onclick="switchMode('video')">🎬 動画 × 音源</button>
+    <button class="mode-tab active" id="tabImage" onclick="switchMode('image')">🖼 画像 × 音源</button>
   </div>
 
   <!-- モード説明文 -->
@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-22 16:10 JST";
+const DEPLOY_TIME = "2026-05-22 16:28 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -874,13 +874,13 @@ async function generateCaptionMode() {
 
       const videoStream = srcVideo.captureStream ? srcVideo.captureStream(25) : srcVideo.mozCaptureStream(25);
       const combined = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...videoStream.getAudioTracks()]);
-      const mimes = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
       const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
       const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : {});
       const chunks = [];
 
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/webm' })); };
+      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/mp4' })); };
       recorder.onerror = e => reject(e.error);
 
       recorder.start(100);
@@ -1369,7 +1369,8 @@ function finalize(blob, nameBase) {
   document.getElementById('resultVideo').src = url;
   const dl = document.getElementById('downloadLink');
   dl.href = url;
-  dl.download = nameBase.replace(/\.[^.]+$/, '') + '_video.' + (blob.type.includes('mp4') ? 'mp4' : 'webm');
+  const ext = blob.type.includes('mp4') ? 'mp4' : blob.type.includes('webm') ? 'webm' : 'mp4';
+  dl.download = nameBase.replace(/\.[^.]+$/, '') + '_video.' + ext;
   document.getElementById('resultSection').classList.add('show');
 }
 
