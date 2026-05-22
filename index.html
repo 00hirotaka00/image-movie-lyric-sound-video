@@ -21,11 +21,12 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 .header h1 { font-size: 24px; font-weight: 700; }
 
 /* tabs */
-.mode-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 24px; }
-.mode-tab { padding: 11px 4px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600; cursor: pointer; transition: all .2s; }
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 24px; }
+.mode-tab { padding: 10px 2px; border: 2px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--muted); font-family: inherit; font-size: 10px; font-weight: 600; cursor: pointer; transition: all .2s; line-height: 1.4; }
 .mode-tab:hover { border-color: var(--accent); color: var(--accent); }
 .mode-tab.active { border-color: var(--accent); background: var(--accent); color: #fff; }
 .mode-tab.active-orange { border-color: var(--orange); background: var(--orange); color: #fff; }
+.mode-tab.active-green { border-color: var(--green); background: var(--green); color: #fff; }
 
 /* drop zone */
 .drop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
@@ -144,6 +145,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
     <button class="mode-tab active" id="tabImage" onclick="switchMode('image')">🖼 画像 × 音源</button>
     <button class="mode-tab" id="tabVideo" onclick="switchMode('video')">🎬 動画 × 音源</button>
     <button class="mode-tab" id="tabLyric" onclick="switchMode('lyric')">🎤 歌詞×画像/動画×音源</button>
+    <button class="mode-tab" id="tabCaption" onclick="switchMode('caption')">🎙 動画字幕</button>
   </div>
 
   <!-- モード説明文 -->
@@ -407,6 +409,140 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
     </div>
   </div>
 
+  <!-- ═══ 動画字幕モード ═══ -->
+  <div id="modeCaption" style="display:none">
+
+    <div class="section-label">STEP 1 — 音あり動画をアップ</div>
+    <div class="drop-zone" id="capVideoZone" style="margin-bottom:16px" onclick="document.getElementById('capVideoInput').click()">
+      <input type="file" id="capVideoInput" accept="video/*">
+      <span class="drop-icon">🎙</span>
+      <span class="drop-label">音あり動画</span>
+      <span class="drop-hint">MP4 / MOV / WEBM</span>
+      <div class="drop-filename" id="capVideoName"></div>
+    </div>
+    <video id="capVideoPlayer" playsinline style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
+
+    <div class="section-label">STEP 2 — 字幕テキストを入力（1行1センテンス）</div>
+    <textarea class="lyric-textarea" id="capTextInput" placeholder="おはようございます&#10;今日のテーマは...&#10;..."></textarea>
+
+    <div class="section-label" style="margin-top:14px">STEP 3 — 動画を再生しながらタップ</div>
+    <div class="lyric-tap-area">
+      <div class="lyric-tap-header">
+        <span id="capStatusLabel">準備完了</span>
+        <span class="lyric-tap-timer" id="capTimer">0:00.0</span>
+      </div>
+      <!-- 動画プレビュー -->
+      <div style="background:#000;position:relative;">
+        <video id="capVideoPreview" playsinline style="width:100%;max-height:220px;display:block;object-fit:contain;" muted></video>
+      </div>
+      <div class="lyric-current" id="capCurrent" style="font-size:16px;">ここに字幕が表示されます</div>
+      <div class="lyric-next" id="capNext">次: —</div>
+      <div class="lyric-progress-bar"><div class="lyric-progress-fill" id="capProgressFill"></div></div>
+      <button class="lyric-tap-btn" id="capTapBtn" onclick="onCapTap()" disabled style="background:var(--green);">
+        ▶ 再生スタート（スペースキーでもタップ可）
+      </button>
+    </div>
+
+    <div class="lyric-controls">
+      <button class="btn-sm" onclick="resetCapTap()">🔄 リセット</button>
+      <button class="btn-sm" onclick="rewindCap(10)">◀ 10秒戻す</button>
+      <button class="btn-sm" onclick="rewindCap(5)">◀ 5秒戻す</button>
+      <button class="btn-sm" onclick="undoCapTap()">↩ 1つ取消</button>
+    </div>
+    <div class="lyric-controls" style="margin-top:0">
+      <button class="btn-sm done-btn" id="capDoneBtn" onclick="finalizeCapLrc()" disabled>✅ 完成・字幕に使う</button>
+    </div>
+
+    <div class="lyric-list" id="capList"></div>
+
+    <div class="lrc-result" id="capLrcResult">
+      <div class="section-label" style="margin-top:4px">生成されたタイミングデータ</div>
+      <div class="lrc-preview" id="capLrcPreview"></div>
+    </div>
+
+    <!-- STEP 4: 字幕スタイル -->
+    <div class="subtitle-settings" style="margin-top:16px">
+      <div class="subtitle-settings-title">🎨 STEP 4 — 字幕スタイル設定</div>
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>フォント</label>
+          <select id="capFont" onchange="updateCapPreview()">
+            <option value="gothic" selected>ゴシック</option>
+            <option value="mincho">明朝</option>
+            <option value="maru">丸ゴシック</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>文字サイズ</label>
+          <select id="capSize" onchange="updateCapPreview()">
+            <option value="XXS">XXS（極小）</option>
+            <option value="XS">XS（特小）</option>
+            <option value="S">S（小）</option>
+            <option value="M" selected>M（中）</option>
+            <option value="L">L（大）</option>
+            <option value="XL">XL（特大）</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>文字色</label>
+          <input type="color" id="capColor" value="#ffffff" onchange="updateCapPreview()">
+        </div>
+        <div class="setting-item">
+          <label>背景</label>
+          <select id="capBg" onchange="updateCapPreview()">
+            <option value="none">なし</option>
+            <option value="dark" selected>半透明黒帯</option>
+            <option value="light">半透明白帯</option>
+          </select>
+        </div>
+      </div>
+      <div class="settings-grid-3">
+        <div class="setting-item">
+          <label>縦位置</label>
+          <select id="capPosition" onchange="updateCapPreview()">
+            <option value="top">上部</option>
+            <option value="center">中央</option>
+            <option value="bottom" selected>下部</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>書き方向</label>
+          <select id="capDirection" onchange="updateCapPreview()">
+            <option value="horizontal" selected>横書き</option>
+            <option value="vertical">縦書き</option>
+          </select>
+        </div>
+        <div class="setting-item">
+          <label>縁取り</label>
+          <select id="capStroke" onchange="updateCapPreview()">
+            <option value="none">なし</option>
+            <option value="black" selected>黒縁</option>
+            <option value="white">白縁</option>
+          </select>
+        </div>
+      </div>
+      <!-- テキストプレビュー -->
+      <div class="subtitle-preview-box">
+        <div class="subtitle-preview-text" id="capPreviewText">サンプル字幕テキスト</div>
+      </div>
+      <!-- Canvasプレビュー -->
+      <div id="capCanvasPreviewWrap" style="display:none;margin-top:14px;">
+        <div class="section-label" style="margin-bottom:6px">CANVAS PREVIEW — 実際の表示イメージ</div>
+        <div style="position:relative;width:100%;background:#ccc;border-radius:8px;overflow:hidden;">
+          <canvas id="capPreviewCanvas" style="width:100%;display:block;border-radius:8px;"></canvas>
+          <div style="position:absolute;bottom:8px;right:10px;font-size:10px;color:rgba(255,255,255,0.7);background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;">PREVIEW</div>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px;">
+          💬 表示する字幕：<select id="capPreviewSelect" onchange="renderCapPreviewCanvas()" style="font-size:11px;border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-family:inherit;"></select>
+        </div>
+      </div>
+    </div>
+
+    <div class="info-box" style="margin-top:14px">
+      🎙 元動画の音声をそのまま残して字幕を焼き込みます。「合成する」を押してください。
+    </div>
+  </div>
+
   <!-- 共通 -->
   <div class="divider"></div>
   <div class="fade-toggle">
@@ -438,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-04-07 11:15 JST";
+const DEPLOY_TIME = "2026-05-22 16:10 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -448,12 +584,19 @@ if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
 let currentMode = 'image';
 let imgFile = null, audioFile = null, videoFile = null, audioFile2 = null;
 let lyricImgFile = null, lyricVideoFile = null, lyricAudioFile = null;
+let capVideoFile = null; // 動画字幕モード
 let fadeEnabled = true;
-let lrcData = [];         // [{time, text}]
-let lyricLines = [];
-let lyricIndex = 0;
+let lrcData = [];
+let lyricLines = [], lyricIndex = 0;
 let lyricStartTime = null, lyricTimerInterval = null;
-let lyricPhase = 'idle'; // idle | running | done
+let lyricPhase = 'idle';
+
+// 動画字幕モード用
+let capData = [];        // [{time, text}]
+let capLines = [];
+let capIndex = 0;
+let capStartTime = null, capTimerInterval = null;
+let capPhase = 'idle';
 
 const FONT_MAP = {
   gothic: "'Hiragino Kaku Gothic ProN','Meiryo',sans-serif",
@@ -462,9 +605,10 @@ const FONT_MAP = {
 };
 
 const MODE_DESC = {
-  image: '画像と音源をアップロードして、ドッキングさせるだけのモード。',
-  video: '無音の動画と音源をアップロードして、ドッキングさせるだけのモード。',
-  lyric: '動画内で表示させたい歌詞（or テロップ・字幕）などの文字情報を音源に合わせてタイムスタンプをおこない、画像 または 動画と文字情報と音源をドッキングさせるモード。',
+  image:   '画像と音源をアップロードして、ドッキングさせるだけのモード。',
+  video:   '無音の動画と音源をアップロードして、ドッキングさせるだけのモード。',
+  lyric:   '動画内で表示させたい歌詞（or テロップ・字幕）などの文字情報を音源に合わせてタイムスタンプをおこない、画像 または 動画と文字情報と音源をドッキングさせるモード。',
+  caption: '音あり動画（セリフ・コメント入り）に字幕を焼き込むモード。動画を再生しながらタップでタイムスタンプをおこない、元音声をそのまま残して字幕付き動画を出力します。',
 };
 
 // ══════════════════════════════════════════════
@@ -472,19 +616,20 @@ const MODE_DESC = {
 // ══════════════════════════════════════════════
 function switchMode(mode) {
   currentMode = mode;
-  document.getElementById('modeImage').style.display  = mode === 'image'  ? '' : 'none';
-  document.getElementById('modeVideo').style.display  = mode === 'video'  ? '' : 'none';
-  document.getElementById('modeLyric').style.display  = mode === 'lyric'  ? '' : 'none';
-  document.getElementById('tabImage').className = 'mode-tab' + (mode === 'image' ? ' active' : '');
-  document.getElementById('tabVideo').className = 'mode-tab' + (mode === 'video' ? ' active' : '');
-  document.getElementById('tabLyric').className = 'mode-tab' + (mode === 'lyric' ? ' active-orange' : '');
+  document.getElementById('modeImage').style.display   = mode === 'image'   ? '' : 'none';
+  document.getElementById('modeVideo').style.display   = mode === 'video'   ? '' : 'none';
+  document.getElementById('modeLyric').style.display   = mode === 'lyric'   ? '' : 'none';
+  document.getElementById('modeCaption').style.display = mode === 'caption' ? '' : 'none';
+  document.getElementById('tabImage').className   = 'mode-tab' + (mode === 'image'   ? ' active' : '');
+  document.getElementById('tabVideo').className   = 'mode-tab' + (mode === 'video'   ? ' active' : '');
+  document.getElementById('tabLyric').className   = 'mode-tab' + (mode === 'lyric'   ? ' active-orange' : '');
+  document.getElementById('tabCaption').className = 'mode-tab' + (mode === 'caption' ? ' active-green' : '');
   document.getElementById('modeDesc').textContent = MODE_DESC[mode] || '';
   clearError();
   document.getElementById('resultSection').classList.remove('show');
   document.getElementById('progressWrap').classList.remove('show');
 }
 
-// 初期表示時に説明文をセット
 document.addEventListener('DOMContentLoaded', () => switchMode('image'));
 
 function switchLyricMediaType() {
@@ -492,6 +637,273 @@ function switchLyricMediaType() {
   document.getElementById('lyricImageZoneWrap').style.display = t === 'image' ? '' : 'none';
   document.getElementById('lyricVideoZoneWrap').style.display = t === 'video' ? '' : 'none';
   document.getElementById('lyricAspectWrap').style.display    = t === 'image' ? '' : 'none';
+}
+
+// ══════════════════════════════════════════════
+// 動画字幕モード — DROP
+// ══════════════════════════════════════════════
+setupDrop('capVideoZone', f => handleCapVideo(f));
+document.getElementById('capVideoInput').addEventListener('change', e => { if (e.target.files[0]) handleCapVideo(e.target.files[0]); });
+
+function handleCapVideo(f) {
+  capVideoFile = f;
+  document.getElementById('capVideoName').textContent = f.name;
+  document.getElementById('capVideoZone').classList.add('filled');
+  const url = URL.createObjectURL(f);
+  document.getElementById('capVideoPlayer').src = url;
+  document.getElementById('capVideoPreview').src = url;
+  document.getElementById('capTapBtn').disabled = false;
+  document.getElementById('capVideoPreview').addEventListener('loadeddata', () => renderCapPreviewCanvas(), { once: true });
+}
+
+// ══════════════════════════════════════════════
+// 動画字幕モード — タップ
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && currentMode === 'caption') { e.preventDefault(); onCapTap(); }
+});
+
+function onCapTap() {
+  if (capPhase === 'idle') {
+    capLines = document.getElementById('capTextInput').value.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (!capLines.length) { alert('字幕テキストを入力してください'); return; }
+    if (!capVideoFile)    { alert('動画を読み込んでください'); return; }
+    capIndex = 0; capData = [];
+    capPhase = 'running';
+    const player  = document.getElementById('capVideoPlayer');
+    const preview = document.getElementById('capVideoPreview');
+    player.currentTime = 0; player.muted = false; player.play();
+    preview.currentTime = 0; preview.play();
+    capStartTime = Date.now();
+    capTimerInterval = setInterval(() => {
+      const elapsed = (Date.now() - capStartTime) / 1000;
+      document.getElementById('capTimer').textContent = fmtTime(elapsed);
+      if (player.duration)
+        document.getElementById('capProgressFill').style.width = (Math.min(elapsed / player.duration, 1) * 100) + '%';
+    }, 100);
+    player.onended = () => finalizeCapLrc();
+    document.getElementById('capTapBtn').textContent = '👆 タップ（スペースキー可）';
+    document.getElementById('capStatusLabel').textContent = '再生中 — タップで次の字幕へ';
+    updateCapDisplay();
+  } else if (capPhase === 'running') {
+    if (capIndex >= capLines.length) return;
+    const elapsed = (Date.now() - capStartTime) / 1000;
+    capData.push({ time: elapsed, text: capLines[capIndex] });
+    capIndex++;
+    updateCapDisplay(); updateCapList();
+    if (capIndex >= capLines.length) {
+      document.getElementById('capTapBtn').textContent = '✅ 全行タップ完了！';
+      document.getElementById('capTapBtn').disabled = true;
+      document.getElementById('capDoneBtn').disabled = false;
+    }
+  }
+}
+function updateCapDisplay() {
+  document.getElementById('capCurrent').textContent = capLines[capIndex] || '— 完了 —';
+  document.getElementById('capNext').textContent = '次: ' + (capLines[capIndex + 1] || '—');
+}
+function updateCapList() {
+  const list = document.getElementById('capList');
+  list.innerHTML = capData.map(d =>
+    `<div class="lyric-item done"><span class="lyric-item-time">[${fmtLrcTime(d.time)}]</span><span>${d.text}</span></div>`
+  ).join('');
+  list.scrollTop = list.scrollHeight;
+}
+function undoCapTap() {
+  if (!capData.length) return;
+  capData.pop(); capIndex = Math.max(0, capIndex - 1);
+  updateCapDisplay(); updateCapList();
+  document.getElementById('capTapBtn').disabled = false;
+  document.getElementById('capTapBtn').textContent = '👆 タップ（スペースキー可）';
+}
+function rewindCap(seconds) {
+  if (capPhase !== 'running') return;
+  const player  = document.getElementById('capVideoPlayer');
+  const preview = document.getElementById('capVideoPreview');
+  const newTime = Math.max(0, player.currentTime - seconds);
+  player.addEventListener('seeked', function onSeeked() {
+    player.removeEventListener('seeked', onSeeked);
+    capStartTime = Date.now() - player.currentTime * 1000;
+    preview.currentTime = player.currentTime;
+    const before = capData.length;
+    capData = capData.filter(d => d.time < player.currentTime);
+    capIndex = capData.length;
+    updateCapDisplay(); updateCapList();
+    if (before > capData.length) {
+      document.getElementById('capTapBtn').disabled = false;
+      document.getElementById('capTapBtn').textContent = '👆 タップ（スペースキー可）';
+      document.getElementById('capDoneBtn').disabled = true;
+    }
+  }, { once: true });
+  player.currentTime = newTime;
+}
+function resetCapTap() {
+  capPhase = 'idle'; capIndex = 0; capData = [];
+  clearInterval(capTimerInterval);
+  const player  = document.getElementById('capVideoPlayer');
+  const preview = document.getElementById('capVideoPreview');
+  player.pause(); player.currentTime = 0;
+  preview.pause(); preview.currentTime = 0;
+  document.getElementById('capTimer').textContent = '0:00.0';
+  document.getElementById('capProgressFill').style.width = '0%';
+  document.getElementById('capCurrent').textContent = 'ここに字幕が表示されます';
+  document.getElementById('capNext').textContent = '次: —';
+  document.getElementById('capTapBtn').textContent = '▶ 再生スタート（スペースキーでもタップ可）';
+  document.getElementById('capTapBtn').disabled = !capVideoFile;
+  document.getElementById('capDoneBtn').disabled = true;
+  document.getElementById('capList').innerHTML = '';
+  document.getElementById('capLrcResult').classList.remove('show');
+  document.getElementById('capStatusLabel').textContent = '準備完了';
+}
+function finalizeCapLrc() {
+  clearInterval(capTimerInterval);
+  capPhase = 'done';
+  document.getElementById('capVideoPlayer').pause();
+  document.getElementById('capVideoPreview').pause();
+  document.getElementById('capStatusLabel').textContent = '✅ タイミング完成！';
+  document.getElementById('capDoneBtn').disabled = false;
+  document.getElementById('capLrcPreview').textContent = capData.map(d => `[${fmtLrcTime(d.time)}] ${d.text}`).join('\n');
+  document.getElementById('capLrcResult').classList.add('show');
+  renderCapPreviewCanvas();
+}
+
+// ══════════════════════════════════════════════
+// 動画字幕モード — スタイルプレビュー
+// ══════════════════════════════════════════════
+function updateCapPreview() {
+  const font      = FONT_MAP[document.getElementById('capFont').value];
+  const size      = document.getElementById('capSize').value;
+  const color     = document.getElementById('capColor').value;
+  const bg        = document.getElementById('capBg').value;
+  const direction = document.getElementById('capDirection').value;
+  const stroke    = document.getElementById('capStroke').value;
+  const sizeMap   = { XXS:'9px', XS:'12px', S:'13px', M:'18px', L:'24px', XL:'30px' };
+  const bgMap     = { none:'transparent', dark:'rgba(0,0,0,0.55)', light:'rgba(255,255,255,0.55)' };
+  const strokeMap = { none:'none', black:'-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000,1px 1px 0 #000', white:'-1px -1px 0 #fff,1px -1px 0 #fff,-1px 1px 0 #fff,1px 1px 0 #fff' };
+  const el = document.getElementById('capPreviewText');
+  el.style.fontFamily   = font;   el.style.fontSize  = sizeMap[size];
+  el.style.color        = color;  el.style.background = bgMap[bg];
+  el.style.padding      = bg !== 'none' ? '5px 12px' : '0';
+  el.style.borderRadius = bg !== 'none' ? '4px' : '0';
+  el.style.textShadow   = strokeMap[stroke];
+  el.style.writingMode  = direction === 'vertical' ? 'vertical-rl' : 'horizontal-tb';
+  renderCapPreviewCanvas();
+}
+updateCapPreview();
+
+async function renderCapPreviewCanvas() {
+  if (!capVideoFile) { document.getElementById('capCanvasPreviewWrap').style.display = 'none'; return; }
+  document.getElementById('capCanvasPreviewWrap').style.display = 'block';
+  const sel = document.getElementById('capPreviewSelect');
+  if (capData.length > 0) {
+    const cur = sel.value;
+    sel.innerHTML = capData.map((d, i) => `<option value="${i}">${d.text.substring(0,20)}</option>`).join('');
+    if (cur && sel.querySelector(`option[value="${cur}"]`)) sel.value = cur;
+  } else { sel.innerHTML = '<option value="">（字幕なし）</option>'; }
+  const pc  = document.getElementById('capPreviewCanvas');
+  const vid = document.getElementById('capVideoPreview');
+  const vw = vid.videoWidth || 1280, vh = vid.videoHeight || 720;
+  const PW = 600, PH = Math.round(PW * vh / vw);
+  pc.width = PW; pc.height = PH;
+  const ctx = pc.getContext('2d');
+  if (vid.readyState >= 2) { ctx.drawImage(vid, 0, 0, PW, PH); }
+  else { ctx.fillStyle = '#444'; ctx.fillRect(0, 0, PW, PH); ctx.fillStyle = '#aaa'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('動画を読み込み中...', PW/2, PH/2); }
+  const subP = buildCapSubtitleParams(PW, PH);
+  const idx  = parseInt(sel.value) || 0;
+  const previewText = capData.length > 0 ? (capData[idx]?.text || capData[0].text) : 'サンプル字幕テキスト';
+  const savedLrc = lrcData;
+  lrcData = [{ time: 0, text: previewText }];
+  drawSubtitle(ctx, 0, PW, PH, subP);
+  lrcData = savedLrc;
+}
+
+function buildCapSubtitleParams(W, H) {
+  const sizeKey = document.getElementById('capSize').value;
+  const sizeMap = { XXS:Math.round(H*.030), XS:Math.round(H*.040), S:Math.round(H*.050), M:Math.round(H*.065), L:Math.round(H*.085), XL:Math.round(H*.110) };
+  return {
+    fontFamily: FONT_MAP[document.getElementById('capFont').value],
+    fontSize:   sizeMap[sizeKey],
+    color:      document.getElementById('capColor').value,
+    bg:         document.getElementById('capBg').value,
+    position:   document.getElementById('capPosition').value,
+    direction:  document.getElementById('capDirection').value,
+    stroke:     document.getElementById('capStroke').value,
+  };
+}
+
+// ══════════════════════════════════════════════
+// 動画字幕モード — 合成
+// ══════════════════════════════════════════════
+async function generateCaptionMode() {
+  if (!capVideoFile)   { showError('動画をアップロードしてください'); throw new Error(); }
+  if (!capData.length) { showError('字幕タイミングが設定されていません（STEP 1〜3を完了してください）'); throw new Error(); }
+
+  setProgress(10, '動画を読み込み中...', 'step 1 / 3');
+  const srcVideo = document.getElementById('capVideoPlayer');
+  await new Promise((res, rej) => {
+    if (srcVideo.readyState >= 2) { res(); return; }
+    srcVideo.onloadeddata = res; srcVideo.onerror = rej;
+  });
+  const duration = srcVideo.duration;
+  const W = srcVideo.videoWidth || 1280, H = srcVideo.videoHeight || 720;
+
+  setProgress(25, 'Canvas準備中...', 'step 2 / 3');
+  const canvas = document.getElementById('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const subP = buildCapSubtitleParams(W, H);
+
+  const savedLrc = lrcData;
+  lrcData = capData;
+
+  setProgress(40, '字幕を焼き込み中...', 'step 3 / 3');
+  const blob = await new Promise(async (resolve, reject) => {
+    try {
+      let recording = true, recordStart = null;
+      srcVideo.currentTime = 0; srcVideo.muted = false;
+      await new Promise(res => { srcVideo.onseeked = res; });
+      await srcVideo.play();
+
+      function drawLoop() {
+        if (!recording) return;
+        ctx.drawImage(srcVideo, 0, 0, W, H);
+        if (recordStart !== null) drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
+        requestAnimationFrame(drawLoop);
+      }
+      drawLoop();
+
+      const videoStream = srcVideo.captureStream ? srcVideo.captureStream(25) : srcVideo.mozCaptureStream(25);
+      const combined = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...videoStream.getAudioTracks()]);
+      const mimes = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+      const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : {});
+      const chunks = [];
+
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/webm' })); };
+      recorder.onerror = e => reject(e.error);
+
+      recorder.start(100);
+      await new Promise(r => setTimeout(r, 100));
+      recordStart = Date.now();
+
+      const t0 = Date.now();
+      const prog = setInterval(() => {
+        const e = (Date.now() - t0) / 1000;
+        setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
+      }, 500);
+      const forceStop = setTimeout(() => {
+        if (recorder.state === 'recording') { clearInterval(prog); recorder.stop(); combined.getTracks().forEach(t => t.stop()); }
+      }, duration * 1000 + 400);
+      srcVideo.onended = () => {
+        clearInterval(prog); clearTimeout(forceStop);
+        if (recorder.state === 'recording') { recorder.stop(); combined.getTracks().forEach(t => t.stop()); }
+      };
+    } catch(e) { reject(e); }
+  });
+
+  lrcData = savedLrc;
+  finalize(blob, capVideoFile.name);
 }
 
 // ══════════════════════════════════════════════
@@ -843,9 +1255,10 @@ async function generate() {
   document.getElementById('progressWrap').classList.add('show');
   document.getElementById('resultSection').classList.remove('show');
   try {
-    if      (currentMode === 'image') await generateImageMode();
-    else if (currentMode === 'video') await generateVideoMode();
-    else                              await generateLyricMode();
+    if      (currentMode === 'image')   await generateImageMode();
+    else if (currentMode === 'video')   await generateVideoMode();
+    else if (currentMode === 'caption') await generateCaptionMode();
+    else                                await generateLyricMode();
   } catch(err) {
     console.error(err);
     if (err && err.message) showError('エラー: ' + err.message);
