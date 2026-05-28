@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-29 06:48 JST";
+const DEPLOY_TIME = "2026-05-29 06:54 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -866,21 +866,22 @@ async function generateCaptionMode() {
 
       // 先頭にシーク・一時停止
       srcVideo.currentTime = 0;
-      srcVideo.muted = true; // Web Audio API経由で音声を出すのでmuted
+      srcVideo.muted = false;
       srcVideo.pause();
-      await new Promise(res => { srcVideo.onseeked = res; });
+      await new Promise(res => {
+        srcVideo.onseeked = res;
+        // すでにcurrentTime=0なら即座に解決
+        if (srcVideo.currentTime === 0) res();
+      });
 
-      // ★ Web Audio APIで元動画の音声を取得・ルーティング
-      const audioCtx = new AudioContext();
-      const dest     = audioCtx.createMediaStreamDestination();
-      const srcNode  = audioCtx.createMediaElementSource(srcVideo);
-      srcNode.connect(dest);
-      srcNode.connect(audioCtx.destination); // スピーカーにも流す
+      // ★ 一時停止状態でcaptureStream取得（音声・映像トラックを同時に確保）
+      const srcStream   = srcVideo.captureStream ? srcVideo.captureStream() : srcVideo.mozCaptureStream();
+      const audioTracks = srcStream.getAudioTracks();
+      const canvasStream = canvas.captureStream(25);
 
-      // Canvas映像 ＋ Web Audio音声を合成
       const combined = new MediaStream([
-        ...canvas.captureStream(25).getVideoTracks(),
-        ...dest.stream.getAudioTracks(),
+        ...canvasStream.getVideoTracks(),
+        ...audioTracks,
       ]);
 
       const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -897,10 +898,9 @@ async function generateCaptionMode() {
       recorder.onstop = () => {
         recording = false;
         srcVideo.pause();
-        audioCtx.close();
         resolve(new Blob(chunks, { type: mimeType || 'video/mp4' }));
       };
-      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
+      recorder.onerror = e => reject(e.error);
 
       function drawLoop() {
         if (!recording) return;
@@ -921,12 +921,26 @@ async function generateCaptionMode() {
         const e = (Date.now() - t0) / 1000;
         setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
       }, 500);
+
+      // ★ forceStopをduration+2秒に余裕を持たせる
       const forceStop = setTimeout(() => {
-        if (recorder.state === 'recording') { clearInterval(prog); recorder.stop(); combined.getTracks().forEach(t => t.stop()); }
-      }, duration * 1000 + 400);
+        if (recorder.state === 'recording') {
+          clearInterval(prog);
+          recorder.stop();
+          combined.getTracks().forEach(t => t.stop());
+        }
+      }, duration * 1000 + 2000);
+
       srcVideo.onended = () => {
-        clearInterval(prog); clearTimeout(forceStop);
-        if (recorder.state === 'recording') { recorder.stop(); combined.getTracks().forEach(t => t.stop()); }
+        clearInterval(prog);
+        clearTimeout(forceStop);
+        // ★ 動画終了後に少し待ってから録画停止（末尾の音声が切れないよう）
+        setTimeout(() => {
+          if (recorder.state === 'recording') {
+            recorder.stop();
+            combined.getTracks().forEach(t => t.stop());
+          }
+        }, 500);
       };
     } catch(e) { reject(e); }
   });
