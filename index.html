@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-29 07:01 JST";
+const DEPLOY_TIME = "2026-05-29 07:30 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -927,6 +927,22 @@ async function generateCaptionMode() {
       await srcVideo.play();  // 映像スタート
       recordStart = Date.now();
 
+      // ★ 映像と音声の同期監視（300msごとに映像がズレていたら補正）
+      const syncTimer = setInterval(() => {
+        if (!recording) return;
+        const audioElapsed = (Date.now() - recordStart) / 1000;
+        const videoElapsed = srcVideo.currentTime;
+        const diff = audioElapsed - videoElapsed;
+        // 0.3秒以上ズレていたら映像を強制シーク
+        if (Math.abs(diff) > 0.3 && audioElapsed < duration) {
+          srcVideo.currentTime = audioElapsed;
+        }
+        // 映像が一時停止していたら再開
+        if (srcVideo.paused && audioElapsed < duration) {
+          srcVideo.play().catch(() => {});
+        }
+      }, 300);
+
       const t0 = Date.now();
       const prog = setInterval(() => {
         const e = (Date.now() - t0) / 1000;
@@ -936,6 +952,7 @@ async function generateCaptionMode() {
       const forceStop = setTimeout(() => {
         if (recorder.state === 'recording') {
           clearInterval(prog);
+          clearInterval(syncTimer);
           recorder.stop();
           combined.getTracks().forEach(t => t.stop());
         }
@@ -943,6 +960,7 @@ async function generateCaptionMode() {
 
       source.onended = () => {
         clearInterval(prog);
+        clearInterval(syncTimer);
         clearTimeout(forceStop);
         if (recorder.state === 'recording') {
           recorder.stop();
