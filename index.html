@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-22 16:28 JST";
+const DEPLOY_TIME = "2026-05-29 06:39 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -860,9 +860,31 @@ async function generateCaptionMode() {
   const blob = await new Promise(async (resolve, reject) => {
     try {
       let recording = true, recordStart = null;
-      srcVideo.currentTime = 0; srcVideo.muted = false;
+
+      // ★ 先頭にシークして一時停止状態にしておく
+      srcVideo.currentTime = 0;
+      srcVideo.muted = false;
+      srcVideo.pause();
       await new Promise(res => { srcVideo.onseeked = res; });
-      await srcVideo.play();
+
+      // ★ 停止状態でストリームを取得（音声トラックを先に確保）
+      const videoStream = srcVideo.captureStream ? srcVideo.captureStream(25) : srcVideo.mozCaptureStream(25);
+      const audioTracks = videoStream.getAudioTracks();
+      const combined = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...audioTracks]);
+
+      const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+      const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
+      const videoBitrate = calcVideoBitrate(W, H);
+      const recorder = new MediaRecorder(combined, {
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: videoBitrate,
+        audioBitsPerSecond: 256_000,
+      });
+      const chunks = [];
+
+      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/mp4' })); };
+      recorder.onerror = e => reject(e.error);
 
       function drawLoop() {
         if (!recording) return;
@@ -872,20 +894,11 @@ async function generateCaptionMode() {
       }
       drawLoop();
 
-      const videoStream = srcVideo.captureStream ? srcVideo.captureStream(25) : srcVideo.mozCaptureStream(25);
-      const combined = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...videoStream.getAudioTracks()]);
-      const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
-      const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-      const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : {});
-      const chunks = [];
-
-      recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/mp4' })); };
-      recorder.onerror = e => reject(e.error);
-
+      // ★ 録画開始 → 即座に動画再生 → recordStart記録（同期）
       recorder.start(100);
-      await new Promise(r => setTimeout(r, 100));
-      recordStart = Date.now();
+      await new Promise(r => setTimeout(r, 50)); // 最小限の待ち
+      await srcVideo.play();
+      recordStart = Date.now(); // 動画再生直後に記録
 
       const t0 = Date.now();
       const prog = setInterval(() => {
@@ -1274,13 +1287,15 @@ async function generateImageMode() {
   const duration = await getMediaDuration(audioFile, 'audio');
 
   setProgress(25, '画像を処理中...', 'step 2 / 3');
+  const bmp = await createImageBitmap(imgFile);
+  // ★ 元画像の解像度を基準にCanvasサイズを決定
   const { width, height } = getCanvasDimensions(
     document.getElementById('aspectSelect').value,
-    document.getElementById('qualitySelect').value
+    document.getElementById('qualitySelect').value,
+    bmp.width, bmp.height
   );
   const canvas = document.getElementById('canvas');
   canvas.width = width; canvas.height = height;
-  const bmp = await createImageBitmap(imgFile);
   drawCoverFit(canvas.getContext('2d'), bmp, width, height);
 
   setProgress(40, '動画を生成中...', 'step 3 / 3');
@@ -1329,13 +1344,14 @@ async function generateLyricMode() {
     if (!lyricImgFile) { showError('画像をアップロードしてください（STEP 5）'); throw new Error(); }
 
     setProgress(25, '画像を処理中...', 'step 2 / 3');
+    const bmp = await createImageBitmap(lyricImgFile);
+    // ★ 元画像の解像度を基準に
     const { width, height } = getCanvasDimensions(
       document.getElementById('lyricAspectSelect').value,
-      'mid' // 字幕モードは標準画質固定
+      'high', bmp.width, bmp.height
     );
     const canvas = document.getElementById('canvas');
     canvas.width = width; canvas.height = height;
-    const bmp = await createImageBitmap(lyricImgFile);
     drawCoverFit(canvas.getContext('2d'), bmp, width, height);
 
     setProgress(40, '動画を生成中...', 'step 3 / 3');
@@ -1353,8 +1369,9 @@ async function generateLyricMode() {
     await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
 
     const canvas = document.getElementById('canvas');
-    canvas.width  = srcVideo.videoWidth  || 720;
-    canvas.height = srcVideo.videoHeight || 1280;
+    // ★ 元動画の解像度をそのまま使う
+    canvas.width  = srcVideo.videoWidth  || 1080;
+    canvas.height = srcVideo.videoHeight || 1920;
 
     setProgress(40, '合成中...', 'step 3 / 3');
     await new Promise(r => setTimeout(r, 200));
@@ -1425,7 +1442,12 @@ function recordMain(canvas, imageBitmap, srcVideo, audioFile, duration) {
       const stream   = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...dest.stream.getAudioTracks()]);
       const mimes    = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
       const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      const videoBitrate = calcVideoBitrate(canvas.width, canvas.height);
+      const recorder = new MediaRecorder(stream, {
+        ...(mimeType ? { mimeType } : {}),
+        videoBitsPerSecond: videoBitrate,
+        audioBitsPerSecond: 256_000,
+      });
       const chunks   = [];
 
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
@@ -1618,11 +1640,36 @@ function getMediaDuration(file, type) {
     el.addEventListener('error', reject);
   });
 }
-function getCanvasDimensions(aspect, quality) {
+function getCanvasDimensions(aspect, quality, srcWidth, srcHeight) {
+  // 元素材の解像度がある場合はそれを基準に使う
+  if (srcWidth && srcHeight) {
+    // アスペクト比に合わせてクロップするだけ、解像度は元素材基準
+    const srcAR = srcWidth / srcHeight;
+    let targetAR;
+    if (aspect === '9:16') targetAR = 9/16;
+    else if (aspect === '1:1') targetAR = 1;
+    else targetAR = 16/9;
+    if (srcAR > targetAR) {
+      // 元素材が横長 → 高さを元素材に合わせる
+      return { width: Math.round(srcHeight * targetAR), height: srcHeight };
+    } else {
+      return { width: srcWidth, height: Math.round(srcWidth / targetAR) };
+    }
+  }
+  // 元素材不明の場合は従来通り
   const base = quality === 'high' ? 1080 : quality === 'mid' ? 720 : 480;
   if (aspect === '9:16') return { width: Math.round(base * 9/16), height: base };
   if (aspect === '1:1')  return { width: base, height: base };
   return { width: base, height: Math.round(base * 9/16) };
+}
+
+// ビットレートを解像度に応じて自動計算（Mbps）
+function calcVideoBitrate(width, height) {
+  const pixels = width * height;
+  if (pixels >= 3840 * 2160) return 40_000_000; // 4K
+  if (pixels >= 1920 * 1080) return 16_000_000; // FHD
+  if (pixels >= 1280 * 720)  return  8_000_000; // HD
+  return 4_000_000;                              // SD
 }
 function drawCoverFit(ctx, img, w, h) {
   const imgAR = img.width / img.height, cAR = w / h;
