@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-29 06:39 JST";
+const DEPLOY_TIME = "2026-05-29 06:48 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -839,11 +839,14 @@ async function generateCaptionMode() {
   if (!capData.length) { showError('字幕タイミングが設定されていません（STEP 1〜3を完了してください）'); throw new Error(); }
 
   setProgress(10, '動画を読み込み中...', 'step 1 / 3');
-  const srcVideo = document.getElementById('capVideoPlayer');
-  await new Promise((res, rej) => {
-    if (srcVideo.readyState >= 2) { res(); return; }
-    srcVideo.onloadeddata = res; srcVideo.onerror = rej;
-  });
+
+  // ★ createMediaElementSourceは1要素1回しか呼べないため、毎回新しいvideo要素を作る
+  const srcVideo = document.createElement('video');
+  srcVideo.src = URL.createObjectURL(capVideoFile);
+  srcVideo.playsInline = true;
+  srcVideo.muted = true;
+  await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
+
   const duration = srcVideo.duration;
   const W = srcVideo.videoWidth || 1280, H = srcVideo.videoHeight || 720;
 
@@ -861,16 +864,24 @@ async function generateCaptionMode() {
     try {
       let recording = true, recordStart = null;
 
-      // ★ 先頭にシークして一時停止状態にしておく
+      // 先頭にシーク・一時停止
       srcVideo.currentTime = 0;
-      srcVideo.muted = false;
+      srcVideo.muted = true; // Web Audio API経由で音声を出すのでmuted
       srcVideo.pause();
       await new Promise(res => { srcVideo.onseeked = res; });
 
-      // ★ 停止状態でストリームを取得（音声トラックを先に確保）
-      const videoStream = srcVideo.captureStream ? srcVideo.captureStream(25) : srcVideo.mozCaptureStream(25);
-      const audioTracks = videoStream.getAudioTracks();
-      const combined = new MediaStream([...canvas.captureStream(25).getVideoTracks(), ...audioTracks]);
+      // ★ Web Audio APIで元動画の音声を取得・ルーティング
+      const audioCtx = new AudioContext();
+      const dest     = audioCtx.createMediaStreamDestination();
+      const srcNode  = audioCtx.createMediaElementSource(srcVideo);
+      srcNode.connect(dest);
+      srcNode.connect(audioCtx.destination); // スピーカーにも流す
+
+      // Canvas映像 ＋ Web Audio音声を合成
+      const combined = new MediaStream([
+        ...canvas.captureStream(25).getVideoTracks(),
+        ...dest.stream.getAudioTracks(),
+      ]);
 
       const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
       const mimeType = mimes.find(m => MediaRecorder.isTypeSupported(m)) || '';
@@ -883,8 +894,13 @@ async function generateCaptionMode() {
       const chunks = [];
 
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-      recorder.onstop = () => { recording = false; srcVideo.pause(); resolve(new Blob(chunks, { type: mimeType || 'video/mp4' })); };
-      recorder.onerror = e => reject(e.error);
+      recorder.onstop = () => {
+        recording = false;
+        srcVideo.pause();
+        audioCtx.close();
+        resolve(new Blob(chunks, { type: mimeType || 'video/mp4' }));
+      };
+      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
 
       function drawLoop() {
         if (!recording) return;
@@ -894,11 +910,11 @@ async function generateCaptionMode() {
       }
       drawLoop();
 
-      // ★ 録画開始 → 即座に動画再生 → recordStart記録（同期）
+      // 録画開始 → 動画再生 → recordStart記録（同期）
       recorder.start(100);
-      await new Promise(r => setTimeout(r, 50)); // 最小限の待ち
+      await new Promise(r => setTimeout(r, 50));
       await srcVideo.play();
-      recordStart = Date.now(); // 動画再生直後に記録
+      recordStart = Date.now();
 
       const t0 = Date.now();
       const prog = setInterval(() => {
