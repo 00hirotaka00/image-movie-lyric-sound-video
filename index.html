@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-29 07:30 JST";
+const DEPLOY_TIME = "2026-05-29 08:02 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -840,18 +840,33 @@ async function generateCaptionMode() {
 
   setProgress(5, '動画・音声を読み込み中...', 'step 1 / 3');
 
-  // ★ 毎回新しいvideo要素で映像を扱う
+  // ★ video要素はDOMに追加（画面外でもブラウザに「使用中」と認識させる）
   const srcVideo = document.createElement('video');
   srcVideo.src = URL.createObjectURL(capVideoFile);
   srcVideo.playsInline = true;
-  srcVideo.muted = true; // 音声はWeb Audio APIで別途処理
+  srcVideo.muted = true;
+  // 画面外に配置するが非表示にはしない（フレームレート維持のため）
+  srcVideo.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:320px;height:180px;opacity:0.01;pointer-events:none;';
+  document.body.appendChild(srcVideo);
   await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
 
   const duration = srcVideo.duration;
-  const W = srcVideo.videoWidth  || 1280;
-  const H = srcVideo.videoHeight || 720;
+  const origW = srcVideo.videoWidth  || 1280;
+  const origH = srcVideo.videoHeight || 720;
 
-  // ★ 音声をArrayBufferで事前デコード（他モードと同じ安定方式）
+  // ★ 自動リサイズ：720pを超える場合はリサイズして負荷を下げる
+  const MAX_PIXELS = 1280 * 720;
+  let W = origW, H = origH;
+  const origPixels = origW * origH;
+  if (origPixels > MAX_PIXELS) {
+    const scale = Math.sqrt(MAX_PIXELS / origPixels);
+    W = Math.round(origW * scale / 2) * 2;
+    H = Math.round(origH * scale / 2) * 2;
+    setProgress(10, `動画をリサイズ中（${origW}×${origH} → ${W}×${H}）`, 'step 1 / 3');
+    await new Promise(r => setTimeout(r, 800)); // ユーザーが読める時間
+  }
+
+  // 音声をArrayBufferで事前デコード
   setProgress(15, '音声をデコード中...', 'step 1 / 3');
   const audioCtx  = new AudioContext();
   const arrayBuf  = await capVideoFile.arrayBuffer();
@@ -860,7 +875,7 @@ async function generateCaptionMode() {
   setProgress(30, 'Canvas準備中...', 'step 2 / 3');
   const canvas = document.getElementById('canvas');
   canvas.width = W; canvas.height = H;
-  const ctx  = canvas.getContext('2d');
+  const ctx  = canvas.getContext('2d', { alpha: false }); // alphaオフでパフォーマンス向上
   const subP = buildCapSubtitleParams(W, H);
 
   const savedLrc = lrcData;
@@ -906,9 +921,15 @@ async function generateCaptionMode() {
         recording = false;
         srcVideo.pause();
         audioCtx.close();
+        // ★ DOMからvideo要素を削除
+        if (srcVideo.parentNode) srcVideo.parentNode.removeChild(srcVideo);
         resolve(new Blob(chunks, { type: mimeType || 'video/mp4' }));
       };
-      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
+      recorder.onerror = e => {
+        audioCtx.close();
+        if (srcVideo.parentNode) srcVideo.parentNode.removeChild(srcVideo);
+        reject(e.error);
+      };
 
       // Canvas描画ループ（映像＋字幕）
       function drawLoop() {
@@ -927,21 +948,21 @@ async function generateCaptionMode() {
       await srcVideo.play();  // 映像スタート
       recordStart = Date.now();
 
-      // ★ 映像と音声の同期監視（300msごとに映像がズレていたら補正）
+      // ★ 映像と音声の同期監視（200msごとに映像がズレていたら補正）
       const syncTimer = setInterval(() => {
         if (!recording) return;
         const audioElapsed = (Date.now() - recordStart) / 1000;
         const videoElapsed = srcVideo.currentTime;
         const diff = audioElapsed - videoElapsed;
-        // 0.3秒以上ズレていたら映像を強制シーク
-        if (Math.abs(diff) > 0.3 && audioElapsed < duration) {
+        // 0.2秒以上ズレていたら映像を強制シーク
+        if (Math.abs(diff) > 0.2 && audioElapsed < duration) {
           srcVideo.currentTime = audioElapsed;
         }
         // 映像が一時停止していたら再開
         if (srcVideo.paused && audioElapsed < duration) {
           srcVideo.play().catch(() => {});
         }
-      }, 300);
+      }, 200);
 
       const t0 = Date.now();
       const prog = setInterval(() => {
