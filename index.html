@@ -574,7 +574,7 @@ html, body { min-height: 100%; background: var(--bg); color: var(--ink); font-fa
 
 <script>
 // デプロイ日時（GitHubにアップする前にupdate_deploy.pyで自動更新）
-const DEPLOY_TIME = "2026-05-29 06:54 JST";
+const DEPLOY_TIME = "2026-05-29 07:01 JST";
 if (DEPLOY_TIME !== "____DEPLOY_TIME____") {
   document.getElementById('deployTime').textContent = 'deployed: ' + DEPLOY_TIME;
 }
@@ -838,22 +838,29 @@ async function generateCaptionMode() {
   if (!capVideoFile)   { showError('動画をアップロードしてください'); throw new Error(); }
   if (!capData.length) { showError('字幕タイミングが設定されていません（STEP 1〜3を完了してください）'); throw new Error(); }
 
-  setProgress(10, '動画を読み込み中...', 'step 1 / 3');
+  setProgress(5, '動画・音声を読み込み中...', 'step 1 / 3');
 
-  // ★ createMediaElementSourceは1要素1回しか呼べないため、毎回新しいvideo要素を作る
+  // ★ 毎回新しいvideo要素で映像を扱う
   const srcVideo = document.createElement('video');
   srcVideo.src = URL.createObjectURL(capVideoFile);
   srcVideo.playsInline = true;
-  srcVideo.muted = true;
+  srcVideo.muted = true; // 音声はWeb Audio APIで別途処理
   await new Promise((res, rej) => { srcVideo.onloadedmetadata = res; srcVideo.onerror = rej; });
 
   const duration = srcVideo.duration;
-  const W = srcVideo.videoWidth || 1280, H = srcVideo.videoHeight || 720;
+  const W = srcVideo.videoWidth  || 1280;
+  const H = srcVideo.videoHeight || 720;
 
-  setProgress(25, 'Canvas準備中...', 'step 2 / 3');
+  // ★ 音声をArrayBufferで事前デコード（他モードと同じ安定方式）
+  setProgress(15, '音声をデコード中...', 'step 1 / 3');
+  const audioCtx  = new AudioContext();
+  const arrayBuf  = await capVideoFile.arrayBuffer();
+  const audioBuf  = await audioCtx.decodeAudioData(arrayBuf);
+
+  setProgress(30, 'Canvas準備中...', 'step 2 / 3');
   const canvas = document.getElementById('canvas');
   canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
+  const ctx  = canvas.getContext('2d');
   const subP = buildCapSubtitleParams(W, H);
 
   const savedLrc = lrcData;
@@ -864,24 +871,24 @@ async function generateCaptionMode() {
     try {
       let recording = true, recordStart = null;
 
-      // 先頭にシーク・一時停止
+      // 映像を先頭にシーク
       srcVideo.currentTime = 0;
-      srcVideo.muted = false;
-      srcVideo.pause();
-      await new Promise(res => {
-        srcVideo.onseeked = res;
-        // すでにcurrentTime=0なら即座に解決
-        if (srcVideo.currentTime === 0) res();
-      });
+      await new Promise(res => { srcVideo.onseeked = res; });
 
-      // ★ 一時停止状態でcaptureStream取得（音声・映像トラックを同時に確保）
-      const srcStream   = srcVideo.captureStream ? srcVideo.captureStream() : srcVideo.mozCaptureStream();
-      const audioTracks = srcStream.getAudioTracks();
-      const canvasStream = canvas.captureStream(25);
+      // Web Audio セットアップ
+      const dest     = audioCtx.createMediaStreamDestination();
+      const gainNode = audioCtx.createGain();
+      gainNode.connect(dest);
+      gainNode.connect(audioCtx.destination);
 
+      const source = audioCtx.createBufferSource();
+      source.buffer = audioBuf;
+      source.connect(gainNode);
+
+      // Canvas映像 ＋ Web Audio音声
       const combined = new MediaStream([
-        ...canvasStream.getVideoTracks(),
-        ...audioTracks,
+        ...canvas.captureStream(25).getVideoTracks(),
+        ...dest.stream.getAudioTracks(),
       ]);
 
       const mimes = ['video/mp4;codecs=avc1,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
@@ -898,22 +905,26 @@ async function generateCaptionMode() {
       recorder.onstop = () => {
         recording = false;
         srcVideo.pause();
+        audioCtx.close();
         resolve(new Blob(chunks, { type: mimeType || 'video/mp4' }));
       };
-      recorder.onerror = e => reject(e.error);
+      recorder.onerror = e => { audioCtx.close(); reject(e.error); };
 
+      // Canvas描画ループ（映像＋字幕）
       function drawLoop() {
         if (!recording) return;
         ctx.drawImage(srcVideo, 0, 0, W, H);
-        if (recordStart !== null) drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
+        if (recordStart !== null)
+          drawSubtitle(ctx, (Date.now() - recordStart) / 1000, W, H, subP);
         requestAnimationFrame(drawLoop);
       }
       drawLoop();
 
-      // 録画開始 → 動画再生 → recordStart記録（同期）
+      // ★ 録画開始 → 映像・音声を同時スタート → recordStart記録
       recorder.start(100);
-      await new Promise(r => setTimeout(r, 50));
-      await srcVideo.play();
+      await new Promise(r => setTimeout(r, 100));
+      source.start(0);        // 音声スタート
+      await srcVideo.play();  // 映像スタート
       recordStart = Date.now();
 
       const t0 = Date.now();
@@ -922,26 +933,23 @@ async function generateCaptionMode() {
         setProgress(40 + Math.min(58, Math.round(e / duration * 58)), '録画中...', `${Math.round(e)}s / ${Math.round(duration)}s`);
       }, 500);
 
-      // ★ forceStopをduration+2秒に余裕を持たせる
       const forceStop = setTimeout(() => {
         if (recorder.state === 'recording') {
           clearInterval(prog);
           recorder.stop();
           combined.getTracks().forEach(t => t.stop());
         }
-      }, duration * 1000 + 2000);
+      }, duration * 1000 + 1000);
 
-      srcVideo.onended = () => {
+      source.onended = () => {
         clearInterval(prog);
         clearTimeout(forceStop);
-        // ★ 動画終了後に少し待ってから録画停止（末尾の音声が切れないよう）
-        setTimeout(() => {
-          if (recorder.state === 'recording') {
-            recorder.stop();
-            combined.getTracks().forEach(t => t.stop());
-          }
-        }, 500);
+        if (recorder.state === 'recording') {
+          recorder.stop();
+          combined.getTracks().forEach(t => t.stop());
+        }
       };
+
     } catch(e) { reject(e); }
   });
 
